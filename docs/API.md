@@ -14,16 +14,16 @@ Base URL saat device terhubung ke WiFi ESP32 (mode AP): `http://192.168.4.1`
 
 Menyalakan pompa untuk rasa tertentu. Kalau ada pompa lain yang masih aktif, request ini akan **ditolak** (lihat kode error di bawah) — mencegah dua rasa tercampur atau konflik multi-user.
 
-| Parameter | Tipe   | Keterangan                                                          |
-| --------- | ------ | ------------------------------------------------------------------- |
-| `flavor`  | string | `"milk"`, `"coffee"`, atau `"tea"` (sesuaikan dengan id rasa final) |
+| Parameter | Tipe   | Keterangan                       |
+| --------- | ------ | -------------------------------- |
+| `flavor`  | string | `"susu"`, `"kopi"`, atau `"teh"` |
 
 **Contoh response sukses (200):**
 
 ```json
 {
   "status": "ok",
-  "active_flavor": "milk",
+  "active_flavor": "susu",
   "pouring": true
 }
 ```
@@ -34,7 +34,7 @@ Menyalakan pompa untuk rasa tertentu. Kalau ada pompa lain yang masih aktif, req
 {
   "status": "error",
   "message": "Pump busy",
-  "active_flavor": "coffee"
+  "active_flavor": "kopi"
 }
 ```
 
@@ -58,14 +58,39 @@ Mematikan pompa yang sedang aktif, siapa pun yang menyalakannya (web atau app).
 
 ---
 
-## 3. Hold-to-Pour (opsional, kalau dipisah dari /pour)
+## 3. Hold-to-Pour (endpoint terpisah dari toggle Start/Stop)
 
-Kalau tim Firmware & App sepakat pakai mekanisme terpisah untuk hold-to-pour (tekan-tahan) vs toggle Start/Stop:
+**Sudah difinalisasi:** hold-to-pour pakai endpoint sendiri, terpisah dari `/pour` (toggle Start/Stop). Firmware tetap menjaga aturan **hanya 1 pompa aktif dalam satu waktu** untuk kedua mekanisme ini — kalau pompa lain (dari toggle Start/Stop maupun hold-to-pour rasa lain) sedang aktif, request akan ditolak dengan `409` seperti pada endpoint `/pour`.
 
-- **`POST /hold/start?flavor={id}`** — dipanggil saat user mulai menekan
+- **`POST /hold/start?flavor={id}`** — dipanggil saat user mulai menekan-tahan
 - **`POST /hold/end`** — dipanggil saat user melepas tekanan
 
-> Catatan: kalau koneksi app terputus saat hold-to-pour aktif, firmware sebaiknya punya **timeout otomatis** (mis. auto-stop kalau tidak ada ping/keep-alive dalam X detik) supaya pompa tidak menyala terus tanpa kontrol.
+**Contoh response sukses `/hold/start` (200):**
+
+```json
+{
+  "status": "ok",
+  "active_flavor": "teh",
+  "pouring": true,
+  "mode": "hold"
+}
+```
+
+**Contoh response gagal — pompa lain aktif (409):**
+
+```json
+{
+  "status": "error",
+  "message": "Pump busy",
+  "active_flavor": "susu"
+}
+```
+
+### Penanganan koneksi terputus saat hold-to-pour aktif
+
+**Sudah difinalisasi:** kalau koneksi terputus (device offline / app force-close / WiFi putus) saat hold-to-pour sedang berjalan, firmware **otomatis menghentikan pompa** dan menganggap proses menuang selesai — bukan menunggu keep-alive/ping dulu. Ini prioritas keamanan: lebih baik pompa berhenti lebih awal daripada menyala tanpa kontrol.
+
+Implementasi disarankan: firmware set timeout pendek (mis. 2-3 detik tanpa request `/hold/start` atau keep-alive lanjutan) yang men-trigger auto-stop.
 
 ---
 
@@ -75,13 +100,15 @@ Kalau tim Firmware & App sepakat pakai mekanisme terpisah untuk hold-to-pour (te
 
 Dipanggil app secara berkala (polling) untuk sinkron dengan status terbaru — penting kalau ada tamu lain yang kontrol lewat web di saat bersamaan.
 
+**Interval polling sudah difinalisasi: 1,5 detik** dari sisi app.
+
 **Contoh response (200):**
 
 ```json
 {
-  "active_flavor": "milk",
+  "active_flavor": "susu",
   "pouring": true,
-  "flavors_available": ["milk", "coffee", "tea"]
+  "flavors_available": ["susu", "kopi", "teh"]
 }
 ```
 
@@ -106,9 +133,10 @@ Dipanggil app secara berkala (polling) untuk sinkron dengan status terbaru — p
 
 ---
 
-## Belum Diputuskan (isi tim setelah diskusi)
+## Keputusan Final Tim
 
-- [ ] Finalisasi nama/id rasa (`milk`/`coffee`/`tea` atau yang lain)
-- [ ] Apakah hold-to-pour pakai endpoint terpisah atau cukup `/pour` + `/stop`
-- [ ] Interval polling `/status` yang ideal dari sisi app (disarankan mulai dari 1-2 detik)
-- [ ] Mekanisme timeout otomatis kalau koneksi putus saat pompa aktif
+- [x] Id rasa: `susu`, `kopi`, `teh`
+- [x] Hold-to-pour pakai endpoint terpisah (`/hold/start`, `/hold/end`), tetap tunduk pada aturan 1-pompa-aktif
+- [x] Interval polling `/status` dari app: **1,5 detik**
+- [x] Kalau koneksi terputus saat pompa aktif: pompa **auto-stop**, proses menuang dianggap selesai (bukan nunggu keep-alive)
+- [x] Nilai timeout pasti untuk auto-stop di firmware adalah 3 detik
