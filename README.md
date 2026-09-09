@@ -25,11 +25,11 @@ Dibangun sebagai project pembelajaran IoT/elektronika sekaligus pemrograman plat
 
 ## Tim & Pembagian Tugas
 
-| Nama         | Scope                  | Tanggung Jawab Utama                                                          |
-| ------------ | ---------------------- | ----------------------------------------------------------------------------- |
-| _(isi nama)_ | Hardware & Elektronika | Wiring ESP32 + relay + pompa, power supply, casing/mekanik                    |
-| _(isi nama)_ | Firmware ESP32         | Captive portal, web UI, endpoint HTTP, logika 1-pompa-aktif & multi-user lock |
-| _(isi nama)_ | App Flutter            | UI carousel rasa, tombol Start/Stop, hold-to-pour, koneksi HTTP ke ESP32      |
+| Nama   | Scope                  | Tanggung Jawab Utama                                                          |
+| ------ | ---------------------- | ----------------------------------------------------------------------------- |
+| Alfian | Hardware & Elektronika | Wiring ESP32 + relay + pompa, power supply, casing/mekanik                    |
+| Galuh  | Firmware ESP32         | Captive portal, web UI, endpoint HTTP, logika 1-pompa-aktif & multi-user lock |
+| Reza   | App Flutter            | UI carousel rasa, tombol Start/Stop, hold-to-pour, koneksi HTTP ke ESP32      |
 
 Kontrak endpoint HTTP antara firmware dan app didokumentasikan di [`docs/API.md`](docs/API.md) — **selalu update dokumen ini kalau ada perubahan endpoint**, supaya tim lain tidak break.
 
