@@ -1,11 +1,13 @@
-# Smart Dispenser IoT (3 Rasa)
+# Smart Locker IoT
 
-Alat penuang minuman otomatis dengan 3 saluran rasa (susu, kopi, teh, atau varian lain), dikendalikan tamu langsung dari HP mereka lewat dua jalur kontrol:
+Sistem penyewaan locker otomatis berbasis IoT. Tiap locker punya **barcode/QR unik**, dan proses sewa dilakukan lewat aplikasi Android (**Flutter**):
 
-1. **Captive portal (web based)** — connect ke WiFi dispenser, interface muncul otomatis.
-2. **App Flutter (Android)** — kontrol alternatif, dikembangkan untuk tugas mata kuliah _Pemrograman Berbasis Platform_.
+1. User **mendaftar** ke sistem Smart Locker (registrasi akun).
+2. User memesan locker → sistem membuat sesi sewa **1x pakai**. Model sesinya seperti **parkir**: tidak ada durasi ditentukan di awal, timer mulai jalan begitu locker dibuka (scan-in), dan total durasi baru dihitung saat sesi diakhiri.
+3. Aplikasi menampilkan **scanner** (memakai kamera HP) → user scan barcode di salah satu locker fisik yang dipilih.
+4. Kalau barcode valid & cocok dengan sesi sewa yang aktif → user diberi **akses membuka locker** tersebut, dan durasi pakainya mulai dihitung berjalan.
 
-Dibangun sebagai project pembelajaran IoT/elektronika sekaligus pemrograman platform, dengan target penggunaan nyata di acara (pernikahan, gathering, bazar).
+Dibangun sebagai project pembelajaran IoT/elektronika & pemrograman platform mobile (kontrol solenoid, koordinasi backend-firmware-app), dengan skala prototipe awal **4 unit locker**.
 
 ---
 
@@ -13,35 +15,36 @@ Dibangun sebagai project pembelajaran IoT/elektronika sekaligus pemrograman plat
 
 ```
 .
-├── firmware/     # Kode ESP32 (captive portal, web server, kontrol relay/pompa)
-├── app/          # Project Flutter (UI kontrol + koneksi HTTP ke ESP32)
-├── hardware/     # Wiring diagram, BOM (bill of materials), datasheet komponen, foto rakitan
+├── firmware/     # Kode microcontroller (ESP32) - kontrol solenoid tiap locker
+├── backend/      # Server API - registrasi user, sesi sewa, validasi barcode
+├── app/          # App Android (Flutter) - scan barcode via kamera HP, status & durasi sewa
 └── docs/         # Dokumentasi konsep, kontrak API, catatan progres
     ├── API.md
-    └── Dokumentasi_Konsep.md
+    └── DEVELOPMENT_GUIDE.md
 ```
 
 ---
 
 ## Tim & Pembagian Tugas
 
-| Nama   | Scope                  | Tanggung Jawab Utama                                                          |
-| ------ | ---------------------- | ----------------------------------------------------------------------------- |
-| Alfian | Hardware & Elektronika | Wiring ESP32 + relay + pompa, power supply, casing/mekanik                    |
-| Galuh  | Firmware ESP32         | Captive portal, web UI, endpoint HTTP, logika 1-pompa-aktif & multi-user lock |
-| Reza   | App Flutter            | UI carousel rasa, tombol Start/Stop, hold-to-pour, koneksi HTTP ke ESP32      |
+| Nama   | Scope                  | Tanggung Jawab Utama                                                         |
+| ------ | ---------------------- | ---------------------------------------------------------------------------- |
+| Alfian | Hardware & Elektronika | Wiring solenoid + relay per locker, power supply, casing/mekanik locker      |
+| Galuh  | Backend & Firmware     | Server API (auth, sesi sewa, validasi barcode), firmware ESP32 kontrol relay |
+| Reza   | App Android (Flutter)  | UI scan barcode (kamera HP), tampilan status & durasi berjalan sewa          |
 
-Kontrak endpoint HTTP antara firmware dan app didokumentasikan di [`docs/API.md`](docs/API.md) — **selalu update dokumen ini kalau ada perubahan endpoint**, supaya tim lain tidak break.
+Kontrak endpoint HTTP antara backend, firmware, dan app didokumentasikan di [`docs/API.md`](docs/API.md) — **selalu update dokumen ini kalau ada perubahan endpoint**, supaya bagian lain tidak break.
 
 ---
 
 ## Arsitektur Singkat
 
-- **Mikrokontroler:** ESP32 sebagai Access Point + DNS server + Web server sekaligus
-- **Kontrol pompa:** 3× relay module (aktif LOW), masing-masing switch 1 pompa dinamo 12V
-- **Single source of truth:** status pompa & flavor aktif dikelola di ESP32, diakses baik oleh web captive portal maupun app Flutter lewat endpoint HTTP yang sama
+- **Backend server:** memegang _single source of truth_ untuk akun user, sesi sewa (rental), dan status tiap locker (kosong/disewa/menunggu-scan)
+- **Microcontroller (ESP32):** terhubung ke WiFi yang sama dengan backend, menerima perintah "buka locker X" dan mengontrol relay → solenoid door lock
+- **App Android (Flutter):** tempat user daftar, pesan locker, dan scan barcode lewat kamera HP (pakai package scanner seperti `mobile_scanner`, bukan scanner fisik terpisah)
+- **Barcode:** ditempel di tiap locker, berisi ID unik locker; validasi keabsahan & kecocokan dengan sesi sewa dilakukan di backend, bukan di app maupun firmware
 
-Detail lengkap ada di [`docs/Dokumentasi_Konsep.md`](docs/Dokumentasi_Konsep.md).
+Detail lengkap ada di [`docs/DEVELOPMENT_GUIDE.md`](docs/DEVELOPMENT_GUIDE.md).
 
 ---
 
@@ -49,8 +52,9 @@ Detail lengkap ada di [`docs/Dokumentasi_Konsep.md`](docs/Dokumentasi_Konsep.md)
 
 - `main` — kode stabil & sudah teruji
 - `feature/firmware-*` — pengembangan firmware ESP32
+- `feature/backend-*` — pengembangan server API
 - `feature/app-*` — pengembangan app Flutter
-- `feature/hardware-*` — dokumentasi wiring, kalibrasi, casing
+- `feature/hardware-*` — dokumentasi wiring, kalibrasi, casing locker
 
 Merge ke `main` lewat Pull Request, bukan push langsung.
 

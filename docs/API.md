@@ -1,142 +1,221 @@
-# Kontrak API — ESP32 Smart Dispenser
+# Kontrak API — Smart Locker
 
-Dokumen ini adalah **kontrak resmi** antara firmware ESP32 (dikerjakan tim Firmware) dan app Flutter (dikerjakan tim App). Endpoint yang sama juga dipakai oleh halaman captive portal (web UI).
+Dokumen ini adalah **kontrak resmi** antara backend server, firmware ESP32 (kontrol solenoid), dan app Android Flutter (dipakai user untuk daftar, pesan, dan scan barcode).
 
-> ⚠️ Kalau ada perubahan endpoint/format, update dokumen ini DULU sebelum ubah kode, lalu kabari tim lain. Ini mencegah app dan firmware saling nggak sinkron.
+> ⚠️ Kalau ada perubahan endpoint/format, update dokumen ini DULU sebelum ubah kode, lalu kabari bagian lain. Ini mencegah app, backend, dan firmware saling nggak sinkron.
 
-Base URL saat device terhubung ke WiFi ESP32 (mode AP): `http://192.168.4.1`
+Base URL backend (contoh): `http://<ip-server-backend>/api`
+Base URL tiap unit firmware locker (LAN lokal): `http://<ip-esp32-locker>`
 
 ---
 
-## 1. Pilih & Tuang Rasa (Start)
+## 1. Registrasi & Login User
 
-**`GET /pour?flavor={id}`**
+**`POST /api/register`**
 
-Menyalakan pompa untuk rasa tertentu. Kalau ada pompa lain yang masih aktif, request ini akan **ditolak** (lihat kode error di bawah) — mencegah dua rasa tercampur atau konflik multi-user.
+| Field      | Tipe   | Keterangan                |
+| ---------- | ------ | ------------------------- |
+| `nama`     | string | Nama user                 |
+| `email`    | string | Email user                |
+| `password` | string | Password (hash di server) |
 
-| Parameter | Tipe   | Keterangan                       |
-| --------- | ------ | -------------------------------- |
-| `flavor`  | string | `"susu"`, `"kopi"`, atau `"teh"` |
+**`POST /api/login`**
 
 **Contoh response sukses (200):**
 
 ```json
 {
   "status": "ok",
-  "active_flavor": "susu",
-  "pouring": true
-}
-```
-
-**Contoh response gagal — pompa lain sedang aktif (409):**
-
-```json
-{
-  "status": "error",
-  "message": "Pump busy",
-  "active_flavor": "kopi"
+  "token": "eyJhbGciOi...",
+  "user_id": "usr_001"
 }
 ```
 
 ---
 
-## 2. Stop Menuang
+## 2. Pesan Locker (Mulai Sesi Sewa)
 
-**`GET /stop`**
+**`POST /api/rentals`**
 
-Mematikan pompa yang sedang aktif, siapa pun yang menyalakannya (web atau app).
+Membuat sesi sewa baru untuk user yang sudah login. **Tidak ada input durasi di sini** — modelnya seperti parkir: user tidak menentukan lama pakai di muka, sistem hanya mencatat kapan sesi dimulai. Sesi ini awalnya berstatus **`pending_scan`** — belum terikat ke locker fisik mana pun sampai user berhasil scan barcode.
+
+| Field     | Tipe   | Keterangan               |
+| --------- | ------ | ------------------------ |
+| `user_id` | string | Diambil dari token login |
+
+**Contoh response sukses (200):**
+
+```json
+{
+  "status": "ok",
+  "rental_id": "rnt_1001",
+  "rental_status": "pending_scan"
+}
+```
+
+---
+
+## 3. Scan Barcode & Aktivasi Locker
+
+**`POST /api/rentals/{rental_id}/activate`**
+
+Dipanggil app setelah kamera HP berhasil membaca barcode di salah satu locker fisik. Backend memvalidasi:
+
+- Barcode dikenali sebagai locker yang valid
+- Locker tersebut sedang **kosong** (tidak dipakai sesi sewa lain)
+- `rental_id` masih berstatus `pending_scan` dan belum kedaluwarsa
+
+| Field     | Tipe   | Keterangan                          |
+| --------- | ------ | ----------------------------------- |
+| `barcode` | string | Hasil decode barcode dari kamera HP |
+
+**Contoh response sukses (200):**
+
+```json
+{
+  "status": "ok",
+  "rental_status": "active",
+  "locker_id": "locker_02",
+  "unlocked": true,
+  "started_at": "2026-09-14T15:00:00Z"
+}
+```
+
+**Contoh response gagal — locker sedang dipakai sesi lain (409):**
+
+```json
+{
+  "status": "error",
+  "message": "Locker sedang digunakan",
+  "locker_id": "locker_02"
+}
+```
+
+**Contoh response gagal — barcode tidak dikenali (400):**
+
+```json
+{
+  "status": "error",
+  "message": "Barcode tidak valid"
+}
+```
+
+Setelah validasi sukses, backend meneruskan perintah buka ke firmware locker terkait (lihat bagian 5).
+
+---
+
+## 4. Akhiri Sesi Sewa (Ambil Barang / Selesai Pakai)
+
+**`POST /api/rentals/{rental_id}/end`**
+
+Dipanggil user lewat app saat selesai pakai dan mau ambil barang. **Seperti tiket parkir**: total durasi pakai baru dihitung di sini, dari `started_at` sampai waktu endpoint ini dipanggil — bukan dari durasi yang ditentukan di awal.
 
 **Contoh response (200):**
 
 ```json
 {
   "status": "ok",
-  "active_flavor": null,
-  "pouring": false
+  "rental_status": "completed",
+  "locker_id": "locker_02",
+  "unlocked": true,
+  "started_at": "2026-09-14T15:00:00Z",
+  "ended_at": "2026-09-14T16:12:00Z",
+  "total_duration_seconds": 4320
 }
 ```
+
+Backend mengirim sinyal buka ke firmware (supaya user bisa ambil barang), lalu menandai locker kembali **kosong** setelah durasi buka singkat berakhir.
 
 ---
 
-## 3. Hold-to-Pour (endpoint terpisah dari toggle Start/Stop)
+## 5. Perintah Buka ke Firmware (Backend → ESP32)
 
-**Sudah difinalisasi:** hold-to-pour pakai endpoint sendiri, terpisah dari `/pour` (toggle Start/Stop). Firmware tetap menjaga aturan **hanya 1 pompa aktif dalam satu waktu** untuk kedua mekanisme ini — kalau pompa lain (dari toggle Start/Stop maupun hold-to-pour rasa lain) sedang aktif, request akan ditolak dengan `409` seperti pada endpoint `/pour`.
+**`GET /unlock?locker={id}&pulse_ms={durasi}`**
 
-- **`POST /hold/start?flavor={id}`** — dipanggil saat user mulai menekan-tahan
-- **`POST /hold/end`** — dipanggil saat user melepas tekanan
+Dipanggil **backend**, bukan app, langsung ke IP ESP32 locker yang bersangkutan (asumsi backend & ESP32 satu jaringan lokal). Firmware menyalakan relay solenoid selama `pulse_ms` milidetik lalu otomatis mengunci kembali (solenoid fail-secure).
 
-**Contoh response sukses `/hold/start` (200):**
-
-```json
-{
-  "status": "ok",
-  "active_flavor": "teh",
-  "pouring": true,
-  "mode": "hold"
-}
-```
-
-**Contoh response gagal — pompa lain aktif (409):**
-
-```json
-{
-  "status": "error",
-  "message": "Pump busy",
-  "active_flavor": "susu"
-}
-```
-
-### Penanganan koneksi terputus saat hold-to-pour aktif
-
-**Sudah difinalisasi:** kalau koneksi terputus (device offline / app force-close / WiFi putus) saat hold-to-pour sedang berjalan, firmware **otomatis menghentikan pompa** dan menganggap proses menuang selesai — bukan menunggu keep-alive/ping dulu. Ini prioritas keamanan: lebih baik pompa berhenti lebih awal daripada menyala tanpa kontrol.
-
-Implementasi disarankan: firmware set timeout pendek (mis. 2-3 detik tanpa request `/hold/start` atau keep-alive lanjutan) yang men-trigger auto-stop.
-
----
-
-## 4. Cek Status
-
-**`GET /status`**
-
-Dipanggil app secara berkala (polling) untuk sinkron dengan status terbaru — penting kalau ada tamu lain yang kontrol lewat web di saat bersamaan.
-
-**Interval polling sudah difinalisasi: 1,5 detik** dari sisi app.
+| Parameter  | Tipe   | Keterangan                        |
+| ---------- | ------ | --------------------------------- |
+| `locker`   | number | Index locker di unit ini (0-3)    |
+| `pulse_ms` | number | Lama solenoid terbuka (mis. 4000) |
 
 **Contoh response (200):**
 
 ```json
 {
-  "active_flavor": "susu",
-  "pouring": true,
-  "flavors_available": ["susu", "kopi", "teh"]
+  "status": "ok",
+  "locker": 2,
+  "unlocked_for_ms": 4000
 }
 ```
 
 ---
 
-## 5. Kode Status HTTP yang Dipakai
+## 6. Cek Status Locker & Sesi
 
-| Kode | Arti                                                         |
-| ---- | ------------------------------------------------------------ |
-| 200  | Request berhasil diproses                                    |
-| 409  | Konflik — ada pompa lain sedang aktif (lock multi-user)      |
-| 400  | Parameter tidak valid (mis. `flavor` tidak dikenal)          |
-| 500  | Error di sisi firmware/hardware (mis. relay gagal merespons) |
+**`GET /api/rentals/{rental_id}/status`**
+
+Dipanggil app secara berkala (polling) untuk menampilkan **durasi berjalan** (bukan countdown, karena tidak ada durasi tetap di awal — mirip tampilan tiket parkir yang terus menghitung naik).
+
+**Interval polling: 3 detik**.
+
+**Contoh response (200):**
+
+```json
+{
+  "rental_status": "active",
+  "locker_id": "locker_02",
+  "started_at": "2026-09-14T15:00:00Z",
+  "elapsed_seconds": 1080
+}
+```
+
+**`GET /api/lockers`**
+
+Dipanggil app saat user mau tahu berapa locker yang masih kosong sebelum scan (opsional, untuk info awal).
+
+```json
+{
+  "lockers": [
+    { "locker_id": "locker_01", "status": "empty" },
+    { "locker_id": "locker_02", "status": "occupied" },
+    { "locker_id": "locker_03", "status": "empty" },
+    { "locker_id": "locker_04", "status": "empty" }
+  ]
+}
+```
 
 ---
 
-## 6. Catatan Implementasi
+## 7. Kode Status HTTP yang Dipakai
 
-- Semua endpoint pakai `GET` untuk simplicity (kecuali hold-to-pour, opsional pakai `POST`) — samakan gaya antara web JS dan Flutter `http` package.
-- Response selalu JSON, supaya gampang di-parse baik oleh JS di web maupun `dart:convert` di app.
-- CORS: kalau app Flutter mengakses endpoint ini sebagai request lintas origin, pastikan firmware mengirim header `Access-Control-Allow-Origin: *` supaya tidak diblokir.
+| Kode | Arti                                                        |
+| ---- | ----------------------------------------------------------- |
+| 200  | Request berhasil diproses                                   |
+| 400  | Parameter tidak valid (mis. barcode tidak dikenali)         |
+| 401  | Token login tidak valid/kadaluwarsa                         |
+| 409  | Konflik — locker sedang dipakai sesi sewa lain              |
+| 500  | Error di sisi backend/firmware (mis. relay gagal merespons) |
+
+---
+
+## 8. Catatan Implementasi
+
+- Backend adalah **single source of truth** untuk status locker (kosong/disewa) — firmware tidak menyimpan status sewa, hanya mengeksekusi perintah buka dari backend.
+- Response selalu JSON.
+- Solenoid pakai skema **fail-secure**: default terkunci, hanya terbuka selama `pulse_ms` saat menerima perintah, lalu mengunci sendiri. Ini mencegah locker tetap terbuka kalau ESP32/koneksi bermasalah.
+- CORS: **app Flutter (native Android) tidak terkena CORS** karena bukan request dari browser — hanya relevan kalau nanti ada dashboard web tambahan (mis. panel admin) yang mengakses backend dari browser.
+- App user dibangun dengan **Flutter (Android)**, memakai package HTTP (`http`/`dio`) untuk komunikasi ke backend dan package scanner kamera (mis. `mobile_scanner`) untuk baca barcode.
 
 ---
 
 ## Keputusan Final Tim
 
-- [x] Id rasa: `susu`, `kopi`, `teh`
-- [x] Hold-to-pour pakai endpoint terpisah (`/hold/start`, `/hold/end`), tetap tunduk pada aturan 1-pompa-aktif
-- [x] Interval polling `/status` dari app: **1,5 detik**
-- [x] Kalau koneksi terputus saat pompa aktif: pompa **auto-stop**, proses menuang dianggap selesai (bukan nunggu keep-alive)
-- [x] Nilai timeout pasti untuk auto-stop di firmware adalah 3 detik
+- [ ] Durasi pulse solenoid saat buka (draft: 4 detik) — **perlu dikonfirmasi tim**
+- [ ] Apakah ada batas maksimum lama sesi aktif (mis. seperti tarif inap/hilang tiket di parkir), atau sesi bisa berjalan tanpa batas sampai user sendiri mengakhiri — **perlu didiskusikan**
+- [ ] Format & isi barcode tiap locker (ID polos vs terenkripsi/signed) — **perlu didiskusikan** supaya barcode tidak mudah dipalsukan
+- [x] Jumlah unit locker prototipe: 4
+- [x] Barcode discan lewat kamera HP (bukan scanner fisik terpisah)
+- [x] Mekanisme kunci pakai solenoid door lock dikontrol microcontroller
+- [x] Model sesi sewa seperti parkir: tidak ada durasi ditentukan di awal, total durasi dihitung dari waktu mulai (scan-in) sampai selesai (akhiri sesi)
+- [x] App user dibangun dengan **Flutter (Android)**
