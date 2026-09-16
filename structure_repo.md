@@ -1,60 +1,54 @@
 .
 ├── firmware/
 │ ├── src/
-│ │ ├── main.cpp # setup() + loop(), inisialisasi WiFi client & relay/sensor
-│ │ ├── wifi_client.cpp/.h # koneksi ESP32 ke WiFi (STA mode) - beda dari dispenser yang AP mode
+│ │ ├── main.cpp # setup() + loop(), inisialisasi WiFi client, polling loop
+│ │ ├── wifi_client.cpp/.h # koneksi ESP32 ke WiFi kampus (STA mode)
+│ │ ├── backend_poller.cpp/.h # polling GET /api/firmware/{id}/poll tiap 2 detik, eksekusi command
 │ │ ├── lock_control.cpp/.h # kontrol relay + solenoid per locker (0-3), skema fail-secure
-│ │ ├── door_sensor.cpp/.h # baca sensor magnet (reed switch) tiap locker, deteksi buka/tutup
-│ │ ├── http_endpoint.cpp/.h # endpoint HTTP (/unlock) yang dipanggil backend, bukan user langsung
-│ │ └── config.h # SSID/password WiFi, pin relay & sensor magnet per locker, konstanta timeout
+│ │ ├── door_sensor.cpp/.h # baca sensor magnet tiap locker, deteksi opened/closed, debounce
+│ │ ├── event_reporter.cpp/.h # kirim POST /api/firmware/{id}/report saat status pintu berubah
+│ │ └── config.h # SSID/password WiFi, base URL backend, pin relay & sensor per locker
 │ └── platformio.ini (atau .ino kalau pakai Arduino IDE)
 │
-├── backend/ # BARU - tidak ada di project dispenser
+├── backend/
 │ ├── src/
 │ │ ├── index.js # entry point server
 │ │ ├── routes/
-│ │ │ ├── auth.js # /api/register, /api/login
-│ │ │ ├── rentals.js # /api/rentals, /activate, /end, /status
-│ │ │ └── lockers.js # /api/lockers (daftar status tiap locker)
+│ │ │ ├── lockers.js # GET /status, POST /rent, POST /access
+│ │ │ ├── rentals.js # GET /rentals/{id}/status
+│ │ │ ├── firmware.js # GET /firmware/{id}/poll, POST /firmware/{id}/report
+│ │ │ └── admin.js # GET /admin/lockers, POST /admin/lockers/{id}/resolve
 │ │ ├── models/
-│ │ │ ├── user.js
-│ │ │ ├── rental.js # termasuk started_at, ended_at, total_duration_seconds
-│ │ │ └── locker.js
+│ │ │ ├── rental.js # started_at, ended_at, total_duration_seconds, action (continue/end)
+│ │ │ └── locker.js # status: empty/occupied/needs_attention, unlocked_since
 │ │ ├── services/
-│ │ │ └── firmware_client.js # kirim perintah unlock ke IP ESP32 locker yang sesuai
+│ │ │ ├── unique_code.js # generate kode unik + hashing (mirip password hashing)
+│ │ │ ├── command_queue.js # antrian perintah unlock per locker, diambil saat firmware polling
+│ │ │ ├── timeout_monitor.js # job berkala cek locker "unlocked" > 2 menit tanpa event closed
+│ │ │ └── rate_limiter.js # batasi percobaan kode salah per locker
 │ │ └── config/
 │ │ └── db.js # koneksi database
 │ ├── package.json
-│ └── .env.example # kredensial database, secret, dll
+│ └── .env.example # kredensial database, secret hashing, dll
 │
-├── app/ # Project Flutter (Android)
-│ └── lib/
-│ ├── models/
-│ │ ├── user.dart
-│ │ └── rental_status.dart # started_at, elapsed_seconds
-│ ├── services/
-│ │ ├── api_service.dart # semua HTTP call ke backend
-│ │ └── barcode_scanner_service.dart # wrapper package scanner (mis. mobile_scanner)
-│ ├── screens/
-│ │ ├── login_screen.dart
-│ │ ├── register_screen.dart
-│ │ ├── scan_screen.dart # scanner kamera untuk baca barcode locker
-│ │ └── rental_status_screen.dart # durasi berjalan (naik terus) + tombol akhiri sewa
-│ ├── widgets/
-│ │ └── duration_counter.dart # tampilan durasi berjalan, bukan countdown
-│ └── main.dart
-│ # folder lain (android/, ios/, pubspec.yaml, dll) otomatis dibuat oleh `flutter create`
+├── web/
+│ ├── public/
+│ │ ├── scan.html # halaman hasil scan barcode - render beda tergantung status locker
+│ │ ├── admin.html # dashboard status locker untuk petugas
+│ │ ├── style.css
+│ │ └── script.js # fetch status locker, submit form sewa, submit kode unik, polling durasi
+│ └── README.md # cara build/deploy halaman web (kalau pakai framework, sesuaikan)
 │
 ├── hardware/
 │ ├── wiring_diagram.png # atau .fzz (Fritzing) / .pdf
-│ ├── RAB.xlsx # rencana anggaran biaya (bukan cuma daftar komponen)
+│ ├── RAB.xlsx # rencana anggaran biaya
 │ ├── datasheets/ # datasheet solenoid lock, relay, reed switch, ESP32
 │ └── photos/ # foto progres rakitan 4 unit locker
 │
 └── docs/
 ├── API.md # kontrak endpoint (sudah ada)
 ├── DEVELOPMENT_GUIDE.md # dokumentasi konsep lengkap (sudah ada)
-├── elisitasi/ # BARU - hasil teknik elisitasi
+├── elisitasi/ # hasil teknik elisitasi
 │ ├── Wawancara_Pengguna_Akhir.docx
 │ ├── Wawancara_Pengelola_Aset_Kampus.docx
 │ ├── Wawancara_IT_Jaringan_Kampus.docx

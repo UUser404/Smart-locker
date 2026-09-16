@@ -1,163 +1,135 @@
 # Kontrak API — Smart Locker
 
-Dokumen ini adalah **kontrak resmi** antara backend server, firmware ESP32 (kontrol solenoid), dan app Android Flutter (dipakai user untuk daftar, pesan, dan scan barcode).
+Dokumen ini adalah **kontrak resmi** antara backend server, firmware ESP32 (kontrol solenoid & sensor magnet), dan web (dipakai user lewat scan barcode, dan petugas lewat dashboard).
 
-> ⚠️ Kalau ada perubahan endpoint/format, update dokumen ini DULU sebelum ubah kode, lalu kabari bagian lain. Ini mencegah app, backend, dan firmware saling nggak sinkron.
+> ⚠️ Kalau ada perubahan endpoint/format, update dokumen ini DULU sebelum ubah kode, lalu kabari bagian lain. Ini mencegah web, backend, dan firmware saling nggak sinkron.
 
-Base URL backend (contoh): `http://<ip-server-backend>/api`
-Base URL tiap unit firmware locker (LAN lokal): `http://<ip-esp32-locker>`
+Base URL backend: `https://<domain-backend>/api` (hosting internet, bukan LAN lokal)
 
----
-
-## 1. Registrasi & Login User
-
-**`POST /api/register`**
-
-| Field      | Tipe   | Keterangan                |
-| ---------- | ------ | ------------------------- |
-| `nama`     | string | Nama user                 |
-| `email`    | string | Email user                |
-| `password` | string | Password (hash di server) |
-
-**`POST /api/login`**
-
-**Contoh response sukses (200):**
-
-```json
-{
-  "status": "ok",
-  "token": "eyJhbGciOi...",
-  "user_id": "usr_001"
-}
-```
+> Catatan arsitektur: karena backend di-hosting di internet sementara ESP32 ada di jaringan lokal kampus, **arah komunikasi firmware terbalik dari desain awal** — ESP32 yang polling ke backend secara berkala, bukan backend yang memanggil IP ESP32 langsung (lihat bagian 5 & 6).
 
 ---
 
-## 2. Pesan Locker (Mulai Sesi Sewa)
+## 1. Cek Status Locker (dipanggil saat barcode di-scan)
 
-**`POST /api/rentals`**
+**`GET /api/lockers/{locker_id}/status`**
 
-Membuat sesi sewa baru untuk user yang sudah login. **Tidak ada input durasi di sini** — modelnya seperti parkir: user tidak menentukan lama pakai di muka, sistem hanya mencatat kapan sesi dimulai. Sesi ini awalnya berstatus **`pending_scan`** — belum terikat ke locker fisik mana pun sampai user berhasil scan barcode.
+Dipanggil halaman web pertama kali dibuka (hasil scan barcode) untuk menentukan tampilan apa yang perlu ditunjukkan ke user.
 
-| Field     | Tipe   | Keterangan               |
-| --------- | ------ | ------------------------ |
-| `user_id` | string | Diambil dari token login |
-
-**Contoh response sukses (200):**
+**Contoh response — locker kosong (200):**
 
 ```json
 {
-  "status": "ok",
-  "rental_id": "rnt_1001",
-  "rental_status": "pending_scan"
-}
-```
-
----
-
-## 3. Scan Barcode & Aktivasi Locker
-
-**`POST /api/rentals/{rental_id}/activate`**
-
-Dipanggil app setelah kamera HP berhasil membaca barcode di salah satu locker fisik. Backend memvalidasi:
-
-- Barcode dikenali sebagai locker yang valid
-- Locker tersebut sedang **kosong** (tidak dipakai sesi sewa lain)
-- `rental_id` masih berstatus `pending_scan` dan belum kedaluwarsa
-
-| Field     | Tipe   | Keterangan                          |
-| --------- | ------ | ----------------------------------- |
-| `barcode` | string | Hasil decode barcode dari kamera HP |
-
-**Contoh response sukses (200):**
-
-```json
-{
-  "status": "ok",
-  "rental_status": "active",
   "locker_id": "locker_02",
-  "unlocked": true,
-  "started_at": "2026-09-14T15:00:00Z"
+  "status": "empty"
 }
 ```
 
-**Contoh response gagal — locker sedang dipakai sesi lain (409):**
+**Contoh response — locker sedang disewa (200):**
+
+```json
+{
+  "locker_id": "locker_02",
+  "status": "occupied"
+}
+```
+
+**Contoh response — locker bermasalah/pintu tidak tertutup (200):**
+
+```json
+{
+  "locker_id": "locker_02",
+  "status": "needs_attention"
+}
+```
+
+`status: "needs_attention"` membuat web menampilkan pesan bahwa locker sedang tidak bisa dipakai sementara, tanpa membuka form sewa baru.
+
+---
+
+## 2. Sewa Locker (Scan Pertama Kali — Locker Kosong)
+
+**`POST /api/lockers/{locker_id}/rent`**
+
+Dipanggil setelah user isi form nama & no HP di halaman hasil scan. **Tidak ada login/registrasi akun** — cukup data ini per sesi.
+
+| Field   | Tipe   | Keterangan       |
+| ------- | ------ | ---------------- |
+| `nama`  | string | Nama penyewa     |
+| `no_hp` | string | Nomor HP penyewa |
+
+Backend akan:
+
+1. Validasi locker masih `empty` (mencegah race condition — lihat bagian 7)
+2. Generate `unique_code` acak (6-8 karakter alfanumerik)
+3. Simpan sesi sewa baru dengan `started_at`
+4. Antrikan perintah "unlock" untuk firmware locker ini (lihat bagian 5)
+
+**Contoh response sukses (200):**
+
+```json
+{
+  "status": "ok",
+  "rental_id": "rnt_2001",
+  "unique_code": "A3F9K2",
+  "started_at": "2026-09-16T10:00:00Z"
+}
+```
+
+**PENTING:** `unique_code` hanya dikirim **1 kali** di response ini. Web wajib menampilkannya dengan jelas + tombol copy, dan mengingatkan user untuk menyimpannya sendiri — backend tidak menyimpan kode ini dalam bentuk plain text yang bisa ditampilkan ulang (lihat bagian 8).
+
+**Contoh response gagal — locker sudah tidak kosong (409):**
 
 ```json
 {
   "status": "error",
-  "message": "Locker sedang digunakan",
-  "locker_id": "locker_02"
+  "message": "Locker sudah terisi"
 }
 ```
 
-**Contoh response gagal — barcode tidak dikenali (400):**
+---
+
+## 3. Ambil Barang / Buka Ulang (Scan Ulang — Locker Terisi)
+
+**`POST /api/lockers/{locker_id}/access`**
+
+Dipanggil setelah user (yang locker-nya sedang `occupied`) memasukkan kode uniknya di halaman hasil scan ulang.
+
+| Field    | Tipe   | Keterangan                                            |
+| -------- | ------ | ----------------------------------------------------- |
+| `code`   | string | Kode unik yang dimasukkan user                        |
+| `action` | string | `"continue"` (lanjut sewa) atau `"end"` (akhiri sewa) |
+
+Backend memvalidasi `code` cocok dengan sesi aktif locker ini. Kalau cocok, antrikan perintah "unlock" ke firmware, dan simpan `action` untuk menentukan apa yang terjadi saat pintu terdeteksi tertutup lagi (lihat bagian 6).
+
+**Contoh response sukses (200):**
+
+```json
+{
+  "status": "ok",
+  "action": "continue",
+  "unlocked": true
+}
+```
+
+**Contoh response gagal — kode salah (400):**
 
 ```json
 {
   "status": "error",
-  "message": "Barcode tidak valid"
+  "message": "Kode tidak valid"
 }
 ```
 
-Setelah validasi sukses, backend meneruskan perintah buka ke firmware locker terkait (lihat bagian 5).
+Pesan ini **sengaja sama** baik untuk kode salah ketik maupun kode yang memang bukan untuk locker ini — supaya tidak memberi petunjuk ke orang yang coba menebak kode locker lain (lihat bagian 8 soal rate limit).
 
 ---
 
-## 4. Akhiri Sesi Sewa (Ambil Barang / Selesai Pakai)
-
-**`POST /api/rentals/{rental_id}/end`**
-
-Dipanggil user lewat app saat selesai pakai dan mau ambil barang. **Seperti tiket parkir**: total durasi pakai baru dihitung di sini, dari `started_at` sampai waktu endpoint ini dipanggil — bukan dari durasi yang ditentukan di awal.
-
-**Contoh response (200):**
-
-```json
-{
-  "status": "ok",
-  "rental_status": "completed",
-  "locker_id": "locker_02",
-  "unlocked": true,
-  "started_at": "2026-09-14T15:00:00Z",
-  "ended_at": "2026-09-14T16:12:00Z",
-  "total_duration_seconds": 4320
-}
-```
-
-Backend mengirim sinyal buka ke firmware (supaya user bisa ambil barang), lalu menandai locker kembali **kosong** setelah durasi buka singkat berakhir.
-
----
-
-## 5. Perintah Buka ke Firmware (Backend → ESP32)
-
-**`GET /unlock?locker={id}&pulse_ms={durasi}`**
-
-Dipanggil **backend**, bukan app, langsung ke IP ESP32 locker yang bersangkutan (asumsi backend & ESP32 satu jaringan lokal). Firmware menyalakan relay solenoid selama `pulse_ms` milidetik lalu otomatis mengunci kembali (solenoid fail-secure).
-
-| Parameter  | Tipe   | Keterangan                        |
-| ---------- | ------ | --------------------------------- |
-| `locker`   | number | Index locker di unit ini (0-3)    |
-| `pulse_ms` | number | Lama solenoid terbuka (mis. 4000) |
-
-**Contoh response (200):**
-
-```json
-{
-  "status": "ok",
-  "locker": 2,
-  "unlocked_for_ms": 4000
-}
-```
-
----
-
-## 6. Cek Status Locker & Sesi
+## 4. Cek Status Sesi (Durasi Berjalan)
 
 **`GET /api/rentals/{rental_id}/status`**
 
-Dipanggil app secara berkala (polling) untuk menampilkan **durasi berjalan** (bukan countdown, karena tidak ada durasi tetap di awal — mirip tampilan tiket parkir yang terus menghitung naik).
-
-**Interval polling: 3 detik**.
+Dipanggil halaman web secara berkala (polling tiap 3 detik) untuk menampilkan durasi berjalan (naik terus, bukan countdown — mengikuti model parkir).
 
 **Contoh response (200):**
 
@@ -165,57 +137,179 @@ Dipanggil app secara berkala (polling) untuk menampilkan **durasi berjalan** (bu
 {
   "rental_status": "active",
   "locker_id": "locker_02",
-  "started_at": "2026-09-14T15:00:00Z",
+  "started_at": "2026-09-16T10:00:00Z",
   "elapsed_seconds": 1080
 }
 ```
 
-**`GET /api/lockers`**
+**Contoh response — sesi sudah selesai (200):**
 
-Dipanggil app saat user mau tahu berapa locker yang masih kosong sebelum scan (opsional, untuk info awal).
+```json
+{
+  "rental_status": "completed",
+  "locker_id": "locker_02",
+  "started_at": "2026-09-16T10:00:00Z",
+  "ended_at": "2026-09-16T10:18:00Z",
+  "total_duration_seconds": 1080
+}
+```
+
+---
+
+## 5. Firmware Polling — Ambil Perintah (ESP32 → Backend)
+
+**`GET /api/firmware/{locker_controller_id}/poll`**
+
+Dipanggil **ESP32**, bukan sebaliknya. Setiap unit controller (menangani hingga 4 locker) memanggil endpoint ini secara berkala (**interval 2 detik**) untuk mengecek apakah ada perintah buka yang perlu dieksekusi.
+
+**Contoh response — ada perintah untuk locker index 2 (200):**
+
+```json
+{
+  "commands": [{ "locker_index": 2, "action": "unlock", "pulse_hold": true }]
+}
+```
+
+`pulse_hold: true` artinya solenoid tetap energized (terbuka) sampai firmware mengirim event "closed" (bagian 6) — bukan pulsa waktu tetap, karena locker ini pakai sensor magnet untuk auto-lock, bukan timer.
+
+**Contoh response — tidak ada perintah (200):**
+
+```json
+{
+  "commands": []
+}
+```
+
+---
+
+## 6. Firmware Melaporkan Status Pintu (ESP32 → Backend)
+
+**`POST /api/firmware/{locker_controller_id}/report`**
+
+Dipanggil ESP32 setiap kali sensor magnet mendeteksi **perubahan status** pintu (dari terbuka ke tertutup, atau sebaliknya) — bukan polling rutin, cuma saat ada perubahan.
+
+| Field          | Tipe   | Keterangan                     |
+| -------------- | ------ | ------------------------------ |
+| `locker_index` | number | Index locker di unit ini (0-3) |
+| `event`        | string | `"opened"` atau `"closed"`     |
+
+Saat backend menerima `event: "closed"`:
+
+- Kalau sesi sedang berstatus `pending_end` (user pilih "Ambil Barang & Akhiri Sewa" di bagian 3) → backend finalisasi sesi (`total_duration_seconds` dihitung, status jadi `completed`, locker kembali `empty`)
+- Kalau tidak (sewa baru atau user pilih "Lanjut Sewa") → backend cukup update locker kembali `occupied` seperti biasa (terkunci lagi, sesi tetap jalan)
+
+**Contoh response (200):**
+
+```json
+{ "status": "ok" }
+```
+
+---
+
+## 7. Mencegah Rebutan Locker yang Sama (Race Condition)
+
+Kalau 2 device mengirim `POST /api/lockers/{locker_id}/rent` di detik yang nyaris sama:
+
+- Backend memproses berdasarkan urutan diterima; permintaan pertama berhasil (locker langsung ditandai `occupied`)
+- Permintaan kedua akan menerima response konflik:
+
+```json
+{
+  "status": "error",
+  "message": "Sedang dalam antrian, silakan coba lagi",
+  "code": "CONCURRENT_REQUEST"
+}
+```
+
+Pesan ini **berbeda** dari pesan "Locker sudah terisi" di bagian 2 — supaya user tahu ini cuma soal waktu (boleh coba scan ulang beberapa detik lagi), bukan karena locker memang sudah keisi orang lain duluan.
+
+---
+
+## 8. Keamanan Kode Unik
+
+- `unique_code` disimpan di database dalam bentuk **hash** (bukan plain text) — mirip prinsip penyimpanan password, supaya kalaupun database bocor, kode user tidak langsung ketahuan.
+- **Rate limit percobaan kode salah**: maksimal 5x percobaan gagal per locker dalam 10 menit, setelah itu endpoint `/access` locker tersebut dikunci sementara (mis. 5 menit) sebelum bisa dicoba lagi.
+- `unique_code` hanya ditampilkan **1 kali** di response `/rent` — tidak ada endpoint untuk "lihat ulang kode saya", karena itu sama saja membuka celah orang lain menebak/melihat kode orang lain.
+
+---
+
+## 9. Mitigasi Pintu Tidak Tertutup (Timeout)
+
+Backend menjalankan job berkala yang mengecek: kalau sebuah locker berstatus "sedang dibuka" (menerima perintah unlock) tapi **belum ada event `"closed"` dalam 2 menit**, locker otomatis ditandai:
+
+```json
+{
+  "locker_id": "locker_02",
+  "status": "needs_attention",
+  "unlocked_since": "2026-09-16T10:05:00Z"
+}
+```
+
+Locker dengan status ini **tidak bisa disewa user baru** (lihat bagian 1) sampai petugas menyelesaikannya lewat dashboard (bagian 10).
+
+---
+
+## 10. Dashboard Petugas
+
+**`GET /api/admin/lockers`**
+
+Menampilkan status semua locker untuk petugas keamanan/kebersihan pantau.
+
+**Contoh response (200):**
 
 ```json
 {
   "lockers": [
     { "locker_id": "locker_01", "status": "empty" },
-    { "locker_id": "locker_02", "status": "occupied" },
-    { "locker_id": "locker_03", "status": "empty" },
+    {
+      "locker_id": "locker_02",
+      "status": "needs_attention",
+      "unlocked_since": "2026-09-16T10:05:00Z"
+    },
+    { "locker_id": "locker_03", "status": "occupied", "elapsed_seconds": 620 },
     { "locker_id": "locker_04", "status": "empty" }
   ]
 }
 ```
 
+**`POST /api/admin/lockers/{locker_id}/resolve`**
+
+Dipanggil petugas setelah mengecek & menutup manual locker yang berstatus `needs_attention`, mengembalikan status locker ke `empty`.
+
+**Contoh response (200):**
+
+```json
+{
+  "status": "ok",
+  "locker_id": "locker_02",
+  "new_status": "empty"
+}
+```
+
+> Catatan: dashboard ini untuk prototipe belum pakai autentikasi khusus (asumsi hanya diakses petugas terpercaya via link internal) — kalau dikembangkan lebih lanjut, perlu ditambah proteksi akses (misal PIN staf).
+
 ---
 
-## 7. Kode Status HTTP yang Dipakai
+## 11. Kode Status HTTP yang Dipakai
 
-| Kode | Arti                                                        |
-| ---- | ----------------------------------------------------------- |
-| 200  | Request berhasil diproses                                   |
-| 400  | Parameter tidak valid (mis. barcode tidak dikenali)         |
-| 401  | Token login tidak valid/kadaluwarsa                         |
-| 409  | Konflik — locker sedang dipakai sesi sewa lain              |
-| 500  | Error di sisi backend/firmware (mis. relay gagal merespons) |
-
----
-
-## 8. Catatan Implementasi
-
-- Backend adalah **single source of truth** untuk status locker (kosong/disewa) — firmware tidak menyimpan status sewa, hanya mengeksekusi perintah buka dari backend.
-- Response selalu JSON.
-- Solenoid pakai skema **fail-secure**: default terkunci, hanya terbuka selama `pulse_ms` saat menerima perintah, lalu mengunci sendiri. Ini mencegah locker tetap terbuka kalau ESP32/koneksi bermasalah.
-- CORS: **app Flutter (native Android) tidak terkena CORS** karena bukan request dari browser — hanya relevan kalau nanti ada dashboard web tambahan (mis. panel admin) yang mengakses backend dari browser.
-- App user dibangun dengan **Flutter (Android)**, memakai package HTTP (`http`/`dio`) untuk komunikasi ke backend dan package scanner kamera (mis. `mobile_scanner`) untuk baca barcode.
+| Kode | Arti                                                         |
+| ---- | ------------------------------------------------------------ |
+| 200  | Request berhasil diproses                                    |
+| 400  | Parameter tidak valid / kode unik salah                      |
+| 409  | Konflik — locker sudah terisi, atau race condition sementara |
+| 429  | Terlalu banyak percobaan kode salah, coba lagi nanti         |
+| 500  | Error di sisi backend/firmware (mis. relay gagal merespons)  |
 
 ---
 
 ## Keputusan Final Tim
 
-- [ ] Durasi pulse solenoid saat buka (draft: 4 detik) — **perlu dikonfirmasi tim**
-- [ ] Apakah ada batas maksimum lama sesi aktif (mis. seperti tarif inap/hilang tiket di parkir), atau sesi bisa berjalan tanpa batas sampai user sendiri mengakhiri — **perlu didiskusikan**
-- [ ] Format & isi barcode tiap locker (ID polos vs terenkripsi/signed) — **perlu didiskusikan** supaya barcode tidak mudah dipalsukan
-- [x] Jumlah unit locker prototipe: 4
-- [x] Barcode discan lewat kamera HP (bukan scanner fisik terpisah)
-- [x] Mekanisme kunci pakai solenoid door lock dikontrol microcontroller
-- [x] Model sesi sewa seperti parkir: tidak ada durasi ditentukan di awal, total durasi dihitung dari waktu mulai (scan-in) sampai selesai (akhiri sesi)
-- [x] App user dibangun dengan **Flutter (Android)**
+- [x] Tidak ada akun permanen — cukup nama & no HP per sesi
+- [x] Kode unik ditampilkan 1x, disimpan sendiri oleh user (dengan tombol copy)
+- [x] Arah komunikasi firmware: ESP32 polling ke backend (bukan backend memanggil IP ESP32), karena backend di-hosting di internet
+- [x] Pilihan "Buka & Lanjut Sewa" vs "Ambil Barang & Akhiri Sewa" saat kode unik dimasukkan
+- [x] Timeout pintu tidak tertutup: 2 menit, lalu locker ditandai `needs_attention`
+- [x] Dashboard status locker untuk petugas keamanan/kebersihan
+- [x] Tidak pakai app Flutter — sepenuhnya berbasis web
+- [ ] Interval polling firmware final (draft: 2 detik) — **perlu dikonfirmasi tim saat uji coba nyata**
+- [ ] Mekanisme pembayaran (rencana masa depan, di luar sesi diakhiri) — **belum didesain, di luar scope prototipe kampus**
