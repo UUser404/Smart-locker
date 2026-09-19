@@ -249,11 +249,13 @@ Locker dengan status ini **tidak bisa disewa user baru** (lihat bagian 1) sampai
 
 ---
 
-## 10. Dashboard Petugas
+## 10. App Petugas Keamanan & Kebersihan (Flutter)
+
+Bagian ini dikonsumsi oleh **app Flutter internal**, bukan halaman web publik.
 
 **`GET /api/admin/lockers`**
 
-Menampilkan status semua locker untuk petugas keamanan/kebersihan pantau.
+Menampilkan status semua locker untuk dashboard di app petugas.
 
 **Contoh response (200):**
 
@@ -274,7 +276,7 @@ Menampilkan status semua locker untuk petugas keamanan/kebersihan pantau.
 
 **`POST /api/admin/lockers/{locker_id}/resolve`**
 
-Dipanggil petugas setelah mengecek & menutup manual locker yang berstatus `needs_attention`, mengembalikan status locker ke `empty`.
+Dipanggil petugas lewat app setelah mengecek & menutup manual locker yang berstatus `needs_attention`, mengembalikan status locker ke `empty`.
 
 **Contoh response (200):**
 
@@ -286,7 +288,34 @@ Dipanggil petugas setelah mengecek & menutup manual locker yang berstatus `needs
 }
 ```
 
-> Catatan: dashboard ini untuk prototipe belum pakai autentikasi khusus (asumsi hanya diakses petugas terpercaya via link internal) — kalau dikembangkan lebih lanjut, perlu ditambah proteksi akses (misal PIN staf).
+**`POST /api/admin/register-device`**
+
+Dipanggil app Flutter sekali saat pertama kali dibuka/login, untuk mendaftarkan token push notification (FCM) milik HP petugas.
+
+| Field        | Tipe   | Keterangan                                            |
+| ------------ | ------ | ----------------------------------------------------- |
+| `fcm_token`  | string | Token push notification dari Firebase Cloud Messaging |
+| `petugas_id` | string | Identitas petugas (nama/NIP, sesuai kebutuhan)        |
+
+**Contoh response (200):**
+
+```json
+{ "status": "ok" }
+```
+
+**Push Notification — dikirim backend ke app (bukan dipanggil app):**
+
+Begitu backend menandai sebuah locker `needs_attention` (lihat bagian 9), backend langsung mengirim push notification lewat FCM ke semua token petugas yang terdaftar, dengan payload kira-kira:
+
+```json
+{
+  "title": "Locker Perlu Perhatian",
+  "body": "Locker_02 - pintu belum tertutup sejak 2 menit lalu",
+  "data": { "locker_id": "locker_02" }
+}
+```
+
+> Catatan: app ini untuk prototipe belum pakai autentikasi login penuh (asumsi hanya dipakai petugas terpercaya, instalasi app terbatas ke HP mereka) — kalau dikembangkan lebih lanjut, perlu ditambah login/PIN staf.
 
 ---
 
@@ -309,7 +338,7 @@ Dipanggil petugas setelah mengecek & menutup manual locker yang berstatus `needs
 - [x] Arah komunikasi firmware: ESP32 polling ke backend (bukan backend memanggil IP ESP32), karena backend di-hosting di internet
 - [x] Pilihan "Buka & Lanjut Sewa" vs "Ambil Barang & Akhiri Sewa" saat kode unik dimasukkan
 - [x] Timeout pintu tidak tertutup: 2 menit, lalu locker ditandai `needs_attention`
-- [x] Dashboard status locker untuk petugas keamanan/kebersihan
-- [x] Tidak pakai app Flutter — sepenuhnya berbasis web
+- [x] Dashboard status locker untuk Petugas Keamanan & Kebersihan, dibangun sebagai **app Flutter (Android)** — dipilih karena butuh push notification, bukan web
+- [x] Sisi pelanggan tetap sepenuhnya web (tanpa app, tanpa akun)
 - [ ] Interval polling firmware final (draft: 2 detik) — **perlu dikonfirmasi tim saat uji coba nyata**
 - [ ] Mekanisme pembayaran (rencana masa depan, di luar sesi diakhiri) — **belum didesain, di luar scope prototipe kampus**

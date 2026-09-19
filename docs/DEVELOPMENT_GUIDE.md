@@ -86,7 +86,7 @@ Dibangun sebagai project pembelajaran IoT (kontrol solenoid, sensor, koordinasi 
                                  sesi selesai, locker jadi kosong]                                 occupied, sesi tetap aktif]
 ```
 
-**Penanganan pintu tidak tertutup:** kalau setelah perintah unlock dieksekusi, firmware tidak pernah mengirim event `"closed"` dalam **2 menit**, backend otomatis menandai locker **`needs_attention`** — locker ini diblokir dari penyewaan baru sampai petugas keamanan/kebersihan mengecek & menutupnya secara manual lewat dashboard.
+**Penanganan pintu tidak tertutup:** kalau setelah perintah unlock dieksekusi, firmware tidak pernah mengirim event `"closed"` dalam **2 menit**, backend otomatis menandai locker **`needs_attention`**, mengirim **push notification** ke app Flutter Petugas Keamanan & Kebersihan, dan locker ini diblokir dari penyewaan baru sampai petugas mengecek & menutupnya secara manual lalu menekan tombol resolve di app.
 
 ---
 
@@ -94,7 +94,8 @@ Dibangun sebagai project pembelajaran IoT (kontrol solenoid, sensor, koordinasi 
 
 - **Backend server (hosting internet):** single source of truth untuk status locker (`empty` / `occupied` / `needs_attention`), sesi sewa, dan kode unik (disimpan dalam bentuk hash)
 - **Firmware (ESP32 per unit controller, menangani hingga 4 locker):** karena backend ada di internet sementara ESP32 ada di jaringan lokal kampus, **ESP32 yang polling ke backend** (interval 2 detik) untuk ambil perintah unlock, dan melaporkan perubahan status sensor magnet — arah komunikasi ini terbalik dari desain awal project (backend memanggil ESP32 langsung), karena sekarang backend perlu bisa diakses dari internet oleh siapa saja yang scan barcode
-- **Web (halaman publik + dashboard petugas):** semua interaksi user lewat browser HP hasil scan barcode — form sewa, tampilan kode unik, input kode unik untuk ambil barang; ditambah dashboard status locker untuk petugas keamanan/kebersihan
+- **Web (pelanggan, diakses lewat scan barcode):** semua interaksi user publik lewat browser HP hasil scan barcode — form sewa, tampilan kode unik, input kode unik untuk ambil barang. Tidak ada fitur admin di sini.
+- **App Flutter (internal, Petugas Keamanan & Kebersihan):** dashboard status semua locker, tombol resolve untuk locker `needs_attention`, dan push notification (via FCM) saat ada locker bermasalah — dipilih Flutter khusus di sisi ini karena kebutuhan notifikasi push, bukan sekadar preferensi
 - **Solenoid door lock:** dikontrol relay dari ESP32, skema fail-secure (default terkunci, terbuka hanya saat menerima sinyal), tetap energized sampai sensor magnet mendeteksi pintu tertutup (bukan pulsa waktu tetap)
 - **Sensor magnet (reed switch):** mendeteksi pintu terbuka/tertutup, jadi pemicu auto-lock sekaligus sinyal ke backend untuk menyelesaikan atau melanjutkan sesi
 
@@ -122,15 +123,17 @@ Detail harga ada di RAB terpisah (`hardware/RAB.xlsx`).
 
 ## 7. Kebutuhan Software / Tools Pengembangan
 
-| Tools                                                     | Fungsi                                                        | Status                |
-| --------------------------------------------------------- | ------------------------------------------------------------- | --------------------- |
-| Arduino IDE / PlatformIO                                  | Development firmware ESP32 (polling + kontrol relay + sensor) | ⏳ Belum dikonfirmasi |
-| Backend framework (mis. Node.js/Express)                  | Membangun REST API (sesi sewa, kode unik, dashboard)          | ⏳ Belum diputuskan   |
-| Database (mis. SQLite/MySQL/PostgreSQL)                   | Menyimpan data sesi sewa, status locker, hash kode unik       | ⏳ Belum diputuskan   |
-| Hosting backend (VPS/cloud kecil)                         | Supaya backend bisa diakses dari internet                     | ⏳ Belum diputuskan   |
-| HTML/CSS/JS atau framework ringan (mis. tanpa build step) | Halaman web user & dashboard petugas                          | ⏳ Belum diputuskan   |
-| Git                                                       | Version control                                               | ⏳ Belum dikonfirmasi |
-| VS Code                                                   | Editor sehari-hari                                            | ⏳ Belum dikonfirmasi |
+| Tools                                                     | Fungsi                                                         | Status                                             |
+| --------------------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------- |
+| Arduino IDE / PlatformIO                                  | Development firmware ESP32 (polling + kontrol relay + sensor)  | ⏳ Belum dikonfirmasi                              |
+| Backend framework (mis. Node.js/Express)                  | Membangun REST API (sesi sewa, kode unik, push notification)   | ⏳ Belum diputuskan                                |
+| Database (mis. SQLite/MySQL/PostgreSQL)                   | Menyimpan data sesi sewa, status locker, hash kode unik        | ⏳ Belum diputuskan                                |
+| Hosting backend (VPS/cloud kecil)                         | Supaya backend bisa diakses dari internet                      | ⏳ Belum diputuskan                                |
+| HTML/CSS/JS atau framework ringan (mis. tanpa build step) | Halaman web pelanggan (sewa, kode unik)                        | ⏳ Belum diputuskan                                |
+| Flutter SDK + Android Studio                              | App dashboard untuk Petugas Keamanan & Kebersihan              | ✅ Sudah diputuskan (reuse dari project dispenser) |
+| Firebase Cloud Messaging (FCM)                            | Push notification ke app petugas saat locker `needs_attention` | ⏳ Belum disetup                                   |
+| Git                                                       | Version control                                                | ⏳ Belum dikonfirmasi                              |
+| VS Code                                                   | Editor sehari-hari                                             | ⏳ Belum dikonfirmasi                              |
 
 ---
 
@@ -141,13 +144,14 @@ Detail harga ada di RAB terpisah (`hardware/RAB.xlsx`).
 3. **Pengadaan komponen & alat** — beli ESP32, relay, solenoid, sensor magnet, adaptor, bahan casing
 4. **Setup backend & hosting** — rancang skema database (rental, locker, kode unik ter-hash), bangun endpoint sesuai `docs/API.md`, siapkan hosting yang bisa diakses internet
 5. **Bench test firmware** — uji 1 relay + 1 solenoid + 1 sensor magnet dulu, pastikan polling ke backend & pelaporan event pintu berjalan benar
-6. **Bangun halaman web** — form sewa, tampilan kode unik, input kode unik, dashboard petugas
-7. **Integrasi ujung-ke-ujung** — dari scan barcode sampai locker terbuka, tertutup otomatis, dan sesi tercatat benar
-8. **Uji 4 unit locker sekaligus** — pastikan tidak ada locker yang salah terbuka / bentrok status, uji race condition
-9. **Rakit casing/mekanik fisik** — pasang solenoid, relay, sensor magnet dalam struktur locker yang aman
-10. **Uji skenario tepi** — pintu tidak ditutup (timeout), kode salah berkali-kali (rate limit), 2 device scan bersamaan
-11. **Simulasi penggunaan oleh orang awam** — minta orang lain coba alur lengkap tanpa instruksi
-12. **Deploy prototipe** untuk demo/pengujian nyata di kampus
+6. **Bangun halaman web pelanggan** — form sewa, tampilan kode unik, input kode unik
+7. **Bangun app Flutter Petugas Keamanan & Kebersihan** — dashboard status locker, tombol resolve, setup push notification (FCM)
+8. **Integrasi ujung-ke-ujung** — dari scan barcode sampai locker terbuka, tertutup otomatis, sesi tercatat benar, dan notifikasi sampai ke app petugas
+9. **Uji 4 unit locker sekaligus** — pastikan tidak ada locker yang salah terbuka / bentrok status, uji race condition
+10. **Rakit casing/mekanik fisik** — pasang solenoid, relay, sensor magnet dalam struktur locker yang aman
+11. **Uji skenario tepi** — pintu tidak ditutup (timeout + push notification), kode salah berkali-kali (rate limit), 2 device scan bersamaan
+12. **Simulasi penggunaan oleh orang awam** — minta orang lain coba alur lengkap tanpa instruksi
+13. **Deploy prototipe** untuk demo/pengujian nyata di kampus
 
 ---
 
@@ -175,6 +179,7 @@ Detail harga ada di RAB terpisah (`hardware/RAB.xlsx`).
 - **Koneksi firmware-backend terputus** — karena firmware bergantung pada polling ke internet, perlu dipikirkan bagaimana perilaku locker kalau koneksi internet di titik locker terputus sementara (retry otomatis, indikator status ke user)
 - **Keamanan fisik solenoid fail-secure** — pastikan solenoid benar-benar default terkunci saat listrik mati
 - **Beban di server backend** — karena backend publik di internet, perlu dipikirkan proteksi dasar (rate limiting per IP, dsb) supaya tidak mudah disalahgunakan orang luar yang menemukan pola URL locker
+- **Distribusi app petugas** — karena app Flutter ini cuma dipakai internal (Petugas Keamanan & Kebersihan), perlu dipikirkan cara instalasinya (APK dibagikan langsung, bukan lewat Play Store, mengingat skala masih prototipe kampus)
 
 ---
 
@@ -184,15 +189,17 @@ Detail harga ada di RAB terpisah (`hardware/RAB.xlsx`).
 - [x] Model sesi seperti parkir: durasi dihitung dari waktu pakai
 - [x] Mekanisme kunci: solenoid + sensor magnet (auto-lock saat pintu tertutup)
 - [x] Alur ambil barang dengan pilihan lanjut/akhiri sewa
-- [x] Mitigasi pintu tidak tertutup: timeout 2 menit + dashboard petugas
+- [x] Mitigasi pintu tidak tertutup: timeout 2 menit + push notification + resolve lewat app petugas
 - [x] Keputusan arsitektur firmware: ESP32 polling ke backend (karena backend hosting internet)
-- [x] Keputusan tidak pakai app Flutter — sepenuhnya berbasis web
+- [x] Keputusan hybrid: sisi pelanggan web (tanpa app, tanpa akun), sisi Petugas Keamanan & Kebersihan pakai app Flutter (dashboard + resolve + push notification)
 - [x] Skala prototipe: 4 unit locker
 - [x] Stakeholder & teknik elisitasi teridentifikasi, materi wawancara sudah dibuat
 - [ ] Setup hosting backend & database
+- [ ] Setup Firebase Cloud Messaging untuk push notification
 - [ ] Kontrak endpoint API detail (draft ada di `docs/API.md`, interval polling & beberapa detail masih perlu dikonfirmasi tim)
 - [ ] Pengembangan firmware (polling + kontrol relay + sensor magnet)
-- [ ] Pengembangan halaman web (form sewa, kode unik, dashboard petugas)
+- [ ] Pengembangan halaman web pelanggan (form sewa, kode unik)
+- [ ] Pengembangan app Flutter petugas (dashboard, resolve, push notification)
 - [ ] Desain casing/mekanik fisik locker
 - [ ] Pengujian skenario tepi (timeout, race condition, rate limit kode)
 - [ ] Pengujian end-to-end 4 unit locker
