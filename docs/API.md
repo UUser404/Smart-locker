@@ -7,14 +7,28 @@ Dokumen ini adalah **kontrak resmi** antara backend server, firmware ESP32 (kont
 Base URL backend: `https://<domain-backend>/api` (hosting internet, bukan LAN lokal)
 
 > Catatan arsitektur: karena backend di-hosting di internet sementara ESP32 ada di jaringan lokal kampus, **arah komunikasi firmware terbalik dari desain awal** — ESP32 yang polling ke backend secara berkala, bukan backend yang memanggil IP ESP32 langsung (lihat bagian 5 & 6).
+>
+> **Update: QR dinamis.** QR di badan locker **tidak lagi statis**. Backend merotasi token per locker secara berkala dan menumpangkannya di response polling firmware (bagian 5), lalu firmware menampilkannya sebagai QR di layar TFT kecil pada locker (lihat `hardware/RAB.xlsx` item 1.12), ganti stiker cetak statis. Halaman web sekarang **membuka kamera & scan QR langsung di dalam web** (bukan lewat kamera bawaan HP membuka link statis). Ini menutup celah sewa jarak jauh — lihat bagian 12.
 
 ---
 
 ## 1. Cek Status Locker (dipanggil saat barcode di-scan)
 
-**`GET /api/lockers/{locker_id}/status`**
+**`GET /api/lockers/{locker_id}/status?token={token}`**
 
-Dipanggil halaman web pertama kali dibuka (hasil scan barcode) untuk menentukan tampilan apa yang perlu ditunjukkan ke user.
+Dipanggil halaman web setelah berhasil scan QR (bukan lagi saat halaman pertama dibuka lewat link) untuk menentukan tampilan apa yang perlu ditunjukkan ke user.
+
+`token` wajib dan berasal dari hasil scan QR barusan (lihat bagian 12). Backend validasi token ini masih berlaku untuk locker tersebut sebelum menjawab.
+
+**Contoh response — token sudah kadaluarsa/tidak cocok (400):**
+
+```json
+{
+  "status": "error",
+  "code": "TOKEN_EXPIRED",
+  "message": "QR sudah kedaluwarsa, silakan scan ulang"
+}
+```
 
 **Contoh response — locker kosong (200):**
 
@@ -53,17 +67,29 @@ Dipanggil halaman web pertama kali dibuka (hasil scan barcode) untuk menentukan 
 
 Dipanggil setelah user isi form nama & no HP di halaman hasil scan. **Tidak ada login/registrasi akun** — cukup data ini per sesi.
 
-| Field   | Tipe   | Keterangan       |
-| ------- | ------ | ---------------- |
-| `nama`  | string | Nama penyewa     |
-| `no_hp` | string | Nomor HP penyewa |
+| Field   | Tipe   | Keterangan                                   |
+| ------- | ------ | -------------------------------------------- |
+| `nama`  | string | Nama penyewa                                 |
+| `no_hp` | string | Nomor HP penyewa                             |
+| `token` | string | Token dari hasil scan QR barusan (bagian 12) |
 
 Backend akan:
 
-1. Validasi locker masih `empty` (mencegah race condition — lihat bagian 7)
-2. Generate `unique_code` acak (6-8 karakter alfanumerik)
-3. Simpan sesi sewa baru dengan `started_at`
-4. Antrikan perintah "unlock" untuk firmware locker ini (lihat bagian 5)
+1. Validasi `token` masih berlaku untuk locker ini (menutup celah sewa jarak jauh — lihat bagian 12)
+2. Validasi locker masih `empty` (mencegah race condition — lihat bagian 7)
+3. Generate `unique_code` acak (6-8 karakter alfanumerik)
+4. Simpan sesi sewa baru dengan `started_at`
+5. Antrikan perintah "unlock" untuk firmware locker ini (lihat bagian 5)
+
+**Contoh response gagal — token kedaluwarsa (400):**
+
+```json
+{
+  "status": "error",
+  "code": "TOKEN_EXPIRED",
+  "message": "QR sudah kedaluwarsa, silakan scan ulang"
+}
+```
 
 **Contoh response sukses (200):**
 
@@ -162,11 +188,19 @@ Dipanggil halaman web secara berkala (polling tiap 3 detik) untuk menampilkan du
 
 Dipanggil **ESP32**, bukan sebaliknya. Setiap unit controller (menangani hingga 4 locker) memanggil endpoint ini secara berkala (**interval 2 detik**) untuk mengecek apakah ada perintah buka yang perlu dieksekusi.
 
+Response sekarang juga membawa `qr_tokens` — token QR terbaru untuk tiap locker di unit ini, supaya firmware bisa merender ulang QR di layar TFT-nya (lihat bagian 12). Field ini selalu ada di setiap response poll, terlepas dari ada/tidaknya `commands`.
+
 **Contoh response — ada perintah untuk locker index 2 (200):**
 
 ```json
 {
-  "commands": [{ "locker_index": 2, "action": "unlock", "pulse_hold": true }]
+  "commands": [{ "locker_index": 2, "action": "unlock", "pulse_hold": true }],
+  "qr_tokens": {
+    "0": "7c1e9a",
+    "1": "b04f2d",
+    "2": "9f3a1c",
+    "3": "e21a88"
+  }
 }
 ```
 
@@ -176,7 +210,13 @@ Dipanggil **ESP32**, bukan sebaliknya. Setiap unit controller (menangani hingga 
 
 ```json
 {
-  "commands": []
+  "commands": [],
+  "qr_tokens": {
+    "0": "7c1e9a",
+    "1": "b04f2d",
+    "2": "9f3a1c",
+    "3": "e21a88"
+  }
 }
 ```
 
@@ -331,10 +371,36 @@ Begitu backend menandai sebuah locker `needs_attention` (lihat bagian 9), backen
 
 ---
 
+## 12. QR Dinamis & Validasi Token
+
+**Kenapa perlu:** kalau QR/link statis, siapa pun yang pernah lihat/menyimpan link-nya bisa buka & "sewa" locker dari jarak jauh — solenoid tetap benar-benar terbuka meski tidak ada orang di depan locker, dan karena tidak ada yang membuka/menutup pintu, locker itu akan timeout jadi `needs_attention` (bagian 9) sia-sia. Kalau pola link ke-4 locker diketahui, ini bisa dipakai melumpuhkan seluruh sistem dari jarak jauh.
+
+**Cara kerja:**
+
+1. Selama locker berstatus `empty`, backend generate token acak pendek per locker dan **merotasinya tiap 5 detik**
+2. Begitu locker berpindah ke `occupied` (ada yang berhasil sewa), backend **membekukan token itu** — tidak dirotasi lagi selama sesi berjalan, supaya QR yang ditampilkan tetap sama saat user yang sama scan ulang untuk ambil barang (bagian 3). Token kembali dirotasi begitu sesi selesai dan locker balik `empty`
+3. Token (baik yang sedang rotasi maupun yang dibekukan) dikirim ke firmware lewat `qr_tokens` di response polling (bagian 5) — tidak perlu koneksi baru, menumpang mekanisme polling yang sudah ada
+4. Firmware merender token jadi QR di layar TFT IPS 1.3" yang ditempel di badan locker (`hardware/RAB.xlsx` item 1.12) — ganti stiker cetak statis
+5. Isi QR: string pendek `{locker_id}.{token}`, contoh: `locker_02.9f3a1c`
+6. Web (halaman awal, bukan hasil buka link) langsung membuka kamera & scan QR ini di dalam halaman itu sendiri (pakai library scan QR di browser)
+7. Hasil scan (`locker_id` + `token`) dikirim ke `GET /status` dan `POST /rent` (lihat bagian 1 & 2) — backend menolak kalau token sudah tidak berlaku untuk locker tersebut
+
+**Masa berlaku token — dipisah dari interval tampilan:**
+
+- **Interval tampilan di layar locker:** 5 detik (locker `empty`) — ini yang membuat "curi lihat dari jauh" sempit jendelanya
+- **Masa berlaku token di sisi backend (untuk validasi `/status` & `/rent`): 60 detik** sejak token itu di-generate — supaya user yang baru saja scan tetap punya waktu wajar mengisi form nama & no HP, walau tampilan di layar locker sudah berganti beberapa kali di detik-detik berikutnya. Backend perlu menyimpan histori singkat token per locker (bukan cuma token yang sedang tampil) supaya validasi 60 detik ini bisa jalan.
+- Untuk locker `occupied`, tidak relevan — token sudah dibekukan sampai sesi selesai.
+
+**Konsekuensi:** endpoint `GET /status` dan `POST /rent` sekarang **mewajibkan** `token` yang valid; endpoint `POST /access` (ambil barang) tetap memakai `unique_code` seperti sebelumnya dan tidak diubah, karena kode unik itu sendiri sudah jadi bukti sah kepemilikan sesi.
+
+---
+
 ## Keputusan Final Tim
 
 - [x] Tidak ada akun permanen — cukup nama & no HP per sesi
 - [x] Kode unik ditampilkan 1x, disimpan sendiri oleh user (dengan tombol copy)
+- [x] QR dinamis (bukan stiker statis) — token dirotasi tiap 5 detik saat locker kosong, dibekukan saat occupied, ditampilkan lewat layar TFT di locker, di-scan langsung di dalam web (bagian 12)
+- [x] Masa berlaku token QR untuk validasi form sewa: 60 detik (terpisah dari interval tampilan 5 detik)
 - [x] Arah komunikasi firmware: ESP32 polling ke backend (bukan backend memanggil IP ESP32), karena backend di-hosting di internet
 - [x] Pilihan "Buka & Lanjut Sewa" vs "Ambil Barang & Akhiri Sewa" saat kode unik dimasukkan
 - [x] Timeout pintu tidak tertutup: 2 menit, lalu locker ditandai `needs_attention`

@@ -2,14 +2,14 @@
 
 Sistem penyewaan locker otomatis berbasis IoT dengan **2 sisi berbeda**: sisi **pelanggan** sepenuhnya berbasis web (tanpa akun, tanpa install apa pun), dan sisi **internal Petugas Keamanan & Kebersihan** berupa app Android (Flutter) untuk memantau & menangani locker di lapangan.
 
-**Alur pelanggan (web, via scan barcode):**
+**Alur pelanggan (web, scan QR dinamis di dalam web):**
 
-1. User melihat locker kosong → **scan barcode fisik** pakai kamera HP bawaan (bukan app khusus).
-2. Barcode membuka halaman web (bisa diakses lewat internet/data seluler) yang menampilkan form singkat: **nama & nomor HP** (tanpa akun permanen).
+1. User melihat locker kosong → buka halaman web di HP-nya, halaman langsung minta izin kamera untuk **scan QR di layar locker** (berganti tiap 5 detik selama locker kosong; bukan lagi lewat kamera bawaan HP membuka link statis).
+2. Web decode QR (berisi `locker_id` + token yang berotasi berkala) dan validasi ke backend, lalu menampilkan form singkat: **nama & nomor HP** (tanpa akun permanen).
 3. Setelah submit, sistem memberi **kode unik 1x lihat** (dengan tombol copy) yang wajib disimpan sendiri oleh user, lalu locker langsung terbuka dan sesi sewa dimulai.
 4. Model sesinya seperti **parkir**: tidak ada durasi ditentukan di awal, timer mulai jalan begitu locker dibuka, dan total durasi baru dihitung saat sesi diakhiri.
 5. Locker otomatis terkunci lagi lewat **sensor magnet** yang mendeteksi pintu tertutup (solenoid fail-secure).
-6. Untuk ambil barang: user **scan ulang barcode yang sama** → masukkan kode unik → pilih **"Buka & Lanjut Sewa"** atau **"Ambil Barang & Akhiri Sewa"**.
+6. Untuk ambil barang: user **scan ulang QR di layar locker yang sama** — QR-nya tidak berubah sejak locker mulai disewa (dibekukan selama sesi aktif) → masukkan kode unik → pilih **"Buka & Lanjut Sewa"** atau **"Ambil Barang & Akhiri Sewa"**.
 
 **Alur Petugas Keamanan & Kebersihan (app Flutter):**
 
@@ -75,6 +75,7 @@ Detail tugas per orang:
 - [ ] Routes: `lockers` (status/rent/access), `rentals` (status sesi), `firmware` (poll/report), `admin` (dashboard/resolve/register-device)
 - [ ] Service `unique_code` — generate kode unik + hashing
 - [ ] Service `command_queue` — antrian perintah unlock per locker
+- [ ] Service `qr_token_rotator` — generate & rotasi token QR per locker secara berkala, sertakan di response polling firmware (`qr_tokens`), validasi token saat `/status` & `/rent` dipanggil
 - [ ] Service `timeout_monitor` — job cek locker "terbuka > 2 menit"
 - [ ] Service `rate_limiter` — batasi percobaan kode salah
 - [ ] Integrasi push notification (FCM) ke app petugas
@@ -85,10 +86,10 @@ Detail tugas per orang:
 
 **Web pelanggan (`web/public/`):**
 
-- [ ] `scan.html` — halaman hasil scan, render beda tergantung status locker (kosong/terisi/perlu perhatian)
+- [ ] `index.html` + scanner QR (kamera browser, decode `locker_id` + token) sebagai halaman awal, render beda tergantung status locker (kosong/terisi/perlu perhatian) setelah token divalidasi
 - [ ] Form sewa (nama & no HP) + tampilan kode unik (dengan tombol copy)
 - [ ] Halaman input kode unik + pilihan "Lanjut Sewa" / "Akhiri Sewa"
-- [ ] `script.js` — fetch status locker, submit form, polling durasi berjalan tiap 3 detik
+- [ ] `script.js` — scan QR, validasi token, fetch status locker, submit form, polling durasi berjalan tiap 3 detik, tangani token kedaluwarsa (balik ke scanner)
 
 **App Flutter petugas (`app/lib/`):**
 
@@ -138,7 +139,7 @@ Kontrak endpoint HTTP antara backend, firmware, web, dan app didokumentasikan di
 
 - **Backend server (hosting internet):** single source of truth untuk status tiap locker (kosong/disewa/perlu perhatian), sesi sewa, dan kode unik. Bisa diakses dari mana saja lewat internet.
 - **Firmware (ESP32 per unit locker):** karena backend di-hosting di internet sementara ESP32 ada di jaringan lokal kampus, **ESP32 yang polling ke backend** secara berkala (bukan backend yang memanggil ESP32 langsung) untuk cek ada perintah buka atau tidak, sekaligus melaporkan status sensor magnet (pintu terbuka/tertutup).
-- **Web (pelanggan, diakses lewat scan barcode):** form sewa singkat (nama & no HP), tampilan kode unik, halaman input kode unik untuk ambil barang. Tidak ada dashboard di sini — murni alur transaksi pelanggan.
+- **Web (pelanggan, scan QR dinamis di dalam web):** halaman langsung buka kamera untuk scan QR di layar locker (bukan lagi lewat kamera bawaan HP membuka link statis), lalu form sewa singkat (nama & no HP), tampilan kode unik, halaman input kode unik untuk ambil barang. Tidak ada dashboard di sini — murni alur transaksi pelanggan.
 - **App Flutter (internal, Petugas Keamanan & Kebersihan):** dashboard status semua locker, tombol resolve untuk locker "perlu perhatian", dan push notification real-time saat ada locker bermasalah — dipilih Flutter (bukan web) khusus di sisi ini karena butuh notifikasi push yang jauh lebih mudah diimplementasikan lewat app native.
 - **Tanpa akun permanen (sisi pelanggan):** identitas user cuma nama + no HP per sesi, diverifikasi lewat kode unik yang di-generate sekali per sesi sewa.
 - **Auto-lock:** sensor magnet (reed switch) mendeteksi pintu tertutup → itu yang memicu backend menandai locker terkunci kembali (atau menyelesaikan sesi, tergantung pilihan user saat itu).

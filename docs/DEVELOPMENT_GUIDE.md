@@ -2,16 +2,16 @@
 
 ## 1. Ringkasan Proyek
 
-Smart Locker adalah sistem penyewaan locker otomatis, **sepenuhnya berbasis web** — tanpa akun permanen dan tanpa install aplikasi apa pun. Tiap unit locker punya **barcode/QR unik** yang berisi link web langsung ke halaman kontrol locker tersebut.
+Smart Locker adalah sistem penyewaan locker otomatis, **sepenuhnya berbasis web** — tanpa akun permanen dan tanpa install aplikasi apa pun. Tiap unit locker punya **layar kecil (TFT) yang menampilkan QR dinamis** — token-nya berganti **tiap 5 detik selama locker kosong**, lalu **dibekukan** (berhenti berganti) begitu ada yang menyewa, supaya QR tetap sama saat dipakai ambil barang nanti.
 
 Alur inti:
 
-1. User scan barcode di locker fisik yang masih kosong lewat kamera HP bawaan
-2. Muncul halaman web (bisa diakses lewat internet) → isi **nama & nomor HP** saja, tanpa daftar akun
+1. User buka halaman web (langsung minta izin kamera) di locker fisik yang masih kosong, lalu **scan QR di layar locker langsung di dalam web** — bukan lewat kamera bawaan HP
+2. Web validasi token QR ke backend → isi **nama & nomor HP** saja, tanpa daftar akun
 3. Sistem memberi **kode unik 1x lihat** (dengan tombol copy) → user simpan sendiri, locker langsung terbuka, sesi mulai
 4. Model sesi seperti **parkir**: durasi dihitung dari waktu pakai, bukan ditentukan di awal
 5. Locker otomatis terkunci lagi lewat **sensor magnet** yang mendeteksi pintu tertutup
-6. Untuk ambil barang: scan ulang barcode yang sama → masukkan kode unik → pilih **lanjut sewa** atau **akhiri sewa**
+6. Untuk ambil barang: scan ulang QR (yang sudah berganti token) → masukkan kode unik → pilih **lanjut sewa** atau **akhiri sewa**
 
 Dibangun sebagai project pembelajaran IoT (kontrol solenoid, sensor, koordinasi backend-firmware-web), dengan skala **prototipe 4 unit locker** di lingkungan kampus.
 
@@ -19,14 +19,14 @@ Dibangun sebagai project pembelajaran IoT (kontrol solenoid, sensor, koordinasi 
 
 ## 2. Analisis 5W1H
 
-| Aspek     | Penjelasan                                                                                                                                        |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **What**  | Sistem locker sewa otomatis berbasis barcode & web, tanpa akun permanen dan tanpa app                                                             |
-| **Where** | Prototipe di lingkungan kampus; backend di-hosting di internet, firmware locker ada di jaringan lokal kampus                                      |
-| **Who**   | Mahasiswa & staf kampus sebagai pengguna utama; juga melibatkan pengelola aset, IT, dosen, keamanan/kebersihan                                    |
-| **Why**   | Proyek belajar IoT (kontrol solenoid, sensor, sistem multi-komponen: backend + firmware + web)                                                    |
-| **When**  | Dipakai kapan saja selama sistem online; tiap sesi 1x pakai, lama pakainya bebas (dihitung, bukan ditentukan di awal)                             |
-| **How**   | Scan barcode → isi nama & no HP → dapat kode unik → locker terbuka, timer jalan → ambil barang: scan ulang + kode unik → pilih lanjut/akhiri sewa |
+| Aspek     | Penjelasan                                                                                                                                                                                    |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **What**  | Sistem locker sewa otomatis berbasis QR dinamis & web, tanpa akun permanen dan tanpa app                                                                                                      |
+| **Where** | Prototipe di lingkungan kampus; backend di-hosting di internet, firmware locker ada di jaringan lokal kampus                                                                                  |
+| **Who**   | Mahasiswa & staf kampus sebagai pengguna utama; juga melibatkan pengelola aset, IT, dosen, keamanan/kebersihan                                                                                |
+| **Why**   | Proyek belajar IoT (kontrol solenoid, sensor, sistem multi-komponen: backend + firmware + web)                                                                                                |
+| **When**  | Dipakai kapan saja selama sistem online; tiap sesi 1x pakai, lama pakainya bebas (dihitung, bukan ditentukan di awal)                                                                         |
+| **How**   | Scan QR dinamis di layar locker (lewat kamera dalam web) → isi nama & no HP → dapat kode unik → locker terbuka, timer jalan → ambil barang: scan ulang + kode unik → pilih lanjut/akhiri sewa |
 
 ---
 
@@ -34,22 +34,26 @@ Dibangun sebagai project pembelajaran IoT (kontrol solenoid, sensor, koordinasi 
 
 ### Sewa Baru (Locker Kosong)
 
-1. User mengarahkan kamera HP ke barcode di salah satu locker fisik yang masih kosong
-2. Terbuka halaman web (browser bawaan HP, tidak perlu install apa pun)
+1. User membuka halaman web di locker fisik yang masih kosong, halaman langsung minta izin kamera untuk scan QR di layar locker (QR ini berganti tiap 5 detik selama locker masih kosong)
+2. Web decode QR (`locker_id` + token), kirim ke backend untuk divalidasi — kalau token masih berlaku, lanjut ke langkah berikut (browser bawaan HP, tidak perlu install apa pun)
 3. Web mengecek status locker → kosong → tampilkan **form singkat**: nama & nomor HP
 4. User submit → backend generate **kode unik** (alfanumerik 6-8 karakter) → ditampilkan **1 kali** di layar dengan tombol copy, disertai peringatan untuk disimpan sendiri
-5. Locker terbuka (solenoid energized), waktu mulai (`started_at`) dicatat — titik ini seperti "ambil tiket parkir"
+5. Locker terbuka (solenoid energized), waktu mulai (`started_at`) dicatat — titik ini seperti "ambil tiket parkir". QR di layar locker juga **berhenti berganti (dibekukan)** mulai titik ini, karena locker sudah `occupied`
 6. User menyimpan barang, menutup pintu → sensor magnet mendeteksi tertutup → solenoid otomatis terkunci lagi, sesi tetap **aktif**
-7. Selama locker dipakai, halaman web (kalau dibuka lagi) bisa menampilkan durasi berjalan (naik terus, bukan countdown)
+7. Selama locker dipakai, halaman web (kalau dibuka lagi & scan ulang) bisa menampilkan durasi berjalan (naik terus, bukan countdown)
 
 ### Ambil Barang / Buka Ulang (Locker Terisi)
 
-8. User scan ulang barcode fisik yang sama
+8. User scan ulang QR di layar locker yang sama — QR-nya **tidak berubah** sejak locker mulai disewa (dibekukan), jadi mudah dikenali sebagai locker yang sama
 9. Web mengecek status locker → terisi → tampilkan pesan **"Locker sudah terisi. Jika Anda penyewa locker ini, masukkan kode unik untuk membukanya"**
 10. User masukkan kode unik → kalau valid, tampil 2 pilihan:
     - **"Buka & Lanjut Sewa"** — locker terbuka, sesi tetap aktif setelah pintu ditutup lagi (misal user cuma mau ambil sesuatu tapi masih perlu locker)
     - **"Ambil Barang & Akhiri Sewa"** — locker terbuka, begitu pintu ditutup lagi sesi dianggap selesai, **total durasi dihitung** dari `started_at` sampai saat itu
 11. Kalau kode salah → pesan generik **"Kode tidak valid"** (sengaja tidak dibedakan dari kasus "locker ini bukan milik Anda", supaya tidak memberi petunjuk ke orang yang coba menebak)
+
+### QR Kedaluwarsa
+
+12. Kalau token QR yang di-scan sudah tidak berlaku (mis. dari screenshot lama atau jeda terlalu lama sebelum submit), web menampilkan pesan **"QR sudah kedaluwarsa, silakan scan ulang"** dan kembali ke tampilan scanner — lihat `docs/API.md` bagian 12 untuk alasan keamanannya
 
 ### Race Condition (2 Device Scan Bersamaan)
 
@@ -60,23 +64,23 @@ Dibangun sebagai project pembelajaran IoT (kontrol solenoid, sensor, koordinasi 
 ## 4. Konsep Alur Sistem (End-to-End)
 
 ```
-[User lihat locker kosong] --> [Scan barcode fisik]
+[User buka web di depan locker kosong] --> [Scan QR dinamis di layar locker, dalam web]
         |
         v
-[Web cek status locker] --(kosong)--> [Form nama & no HP] --> [Backend: generate kode unik, catat started_at]
-        |                                                              |
-        v                                                              v
-   (terisi)                                                  [Perintah unlock diantrikan]
-        |                                                              |
-        v                                                              v
-[Input kode unik] <---------------------------------------- [Firmware polling ambil perintah]
-        |                                                              |
-        v                                                              v
-[Pilih: Lanjut Sewa / Akhiri Sewa]                          [Solenoid terbuka, sensor magnet mulai dipantau]
-        |                                                              |
-        v                                                              v
-                                                    [Pintu ditutup] --> [Firmware laporkan event "closed"]
-                                                                              |
+[Backend validasi token] --(valid)--> [Web cek status locker] --(kosong)--> [Form nama & no HP] --> [Backend: generate kode unik, catat started_at]
+        |                                     |                                                              |
+   (token basi)                               v                                                              v
+        |                                (terisi)                                                  [Perintah unlock diantrikan]
+        v                                     |                                                              |
+[Kembali ke scanner,                          v                                                              v
+ minta scan ulang]                    [Input kode unik] <---------------------------------------- [Firmware polling ambil perintah + qr_tokens]
+                                              |                                                              |
+                                              v                                                              v
+                                    [Pilih: Lanjut Sewa / Akhiri Sewa]                          [Solenoid terbuka, layar TFT render QR baru,
+                                              |                                                   sensor magnet mulai dipantau]
+                                              v                                                              |
+                                                                                    [Pintu ditutup] --> [Firmware laporkan event "closed"]
+                                                                                              |
                                               +-------------------------------+-------------------------------+
                                               |                                                               |
                                      (pilihan = akhiri sewa)                                     (pilihan = lanjut sewa / sewa baru)
@@ -92,9 +96,9 @@ Dibangun sebagai project pembelajaran IoT (kontrol solenoid, sensor, koordinasi 
 
 ## 5. Arsitektur Sistem
 
-- **Backend server (hosting internet):** single source of truth untuk status locker (`empty` / `occupied` / `needs_attention`), sesi sewa, dan kode unik (disimpan dalam bentuk hash)
-- **Firmware (ESP32 per unit controller, menangani hingga 4 locker):** karena backend ada di internet sementara ESP32 ada di jaringan lokal kampus, **ESP32 yang polling ke backend** (interval 2 detik) untuk ambil perintah unlock, dan melaporkan perubahan status sensor magnet — arah komunikasi ini terbalik dari desain awal project (backend memanggil ESP32 langsung), karena sekarang backend perlu bisa diakses dari internet oleh siapa saja yang scan barcode
-- **Web (pelanggan, diakses lewat scan barcode):** semua interaksi user publik lewat browser HP hasil scan barcode — form sewa, tampilan kode unik, input kode unik untuk ambil barang. Tidak ada fitur admin di sini.
+- **Backend server (hosting internet):** single source of truth untuk status locker (`empty` / `occupied` / `needs_attention`), sesi sewa, kode unik (disimpan dalam bentuk hash), dan **token QR** per locker yang dirotasi berkala
+- **Firmware (ESP32 per unit controller, menangani hingga 4 locker):** karena backend ada di internet sementara ESP32 ada di jaringan lokal kampus, **ESP32 yang polling ke backend** (interval 2 detik) untuk ambil perintah unlock **dan token QR terbaru tiap locker** (dirender ke layar TFT), dan melaporkan perubahan status sensor magnet — arah komunikasi ini terbalik dari desain awal project (backend memanggil ESP32 langsung), karena sekarang backend perlu bisa diakses dari internet oleh siapa saja yang scan QR
+- **Web (pelanggan, scan QR dinamis di dalam web):** semua interaksi user publik lewat browser HP — halaman langsung buka kamera untuk scan QR di layar locker (bukan lagi lewat kamera bawaan HP membuka link), lalu form sewa, tampilan kode unik, input kode unik untuk ambil barang. Tidak ada fitur admin di sini.
 - **App Flutter (internal, Petugas Keamanan & Kebersihan):** dashboard status semua locker, tombol resolve untuk locker `needs_attention`, dan push notification (via FCM) saat ada locker bermasalah — dipilih Flutter khusus di sisi ini karena kebutuhan notifikasi push, bukan sekadar preferensi
 - **Solenoid door lock:** dikontrol relay dari ESP32, skema fail-secure (default terkunci, terbuka hanya saat menerima sinyal), tetap energized sampai sensor magnet mendeteksi pintu tertutup (bukan pulsa waktu tetap)
 - **Sensor magnet (reed switch):** mendeteksi pintu terbuka/tertutup, jadi pemicu auto-lock sekaligus sinyal ke backend untuk menyelesaikan atau melanjutkan sesi
@@ -103,19 +107,20 @@ Dibangun sebagai project pembelajaran IoT (kontrol solenoid, sensor, koordinasi 
 
 ## 6. Kebutuhan Komponen (Draft Awal)
 
-| Komponen                    | Spesifikasi                                | Fungsi                                         |
-| --------------------------- | ------------------------------------------ | ---------------------------------------------- |
-| Microcontroller (ESP32)     | 1 unit (kontrol 4 relay + 4 sensor magnet) | Polling backend, kontrol solenoid, baca sensor |
-| Relay module                | 4 channel, aktif LOW                       | Switch tiap solenoid                           |
-| Solenoid door lock          | 12V, fail-secure, 4 unit                   | Mekanisme kunci elektronik tiap locker         |
-| Sensor magnet (reed switch) | 4 unit                                     | Deteksi pintu terbuka/tertutup                 |
-| Adaptor 12V                 | Switching, arus cukup untuk 4 solenoid     | Suplai daya solenoid                           |
-| Step-down buck converter    | 12V → 5V                                   | Suplai daya ESP32 dari sumber sama             |
-| Diode 1N4007                | 4-8 unit                                   | Proteksi flyback dari beban induktif solenoid  |
-| Terminal block              | Screw terminal 2 jalur                     | Titik pembagi daya dari adaptor ke 2 jalur     |
-| Barcode/QR stiker           | Cetak, 1 per locker                        | Berisi link web unik ke halaman kontrol locker |
-| Casing/rangka locker        | Lemari 4 pintu 2 susun                     | Struktur fisik locker                          |
-| Server backend              | Hosting internet (VPS/cloud kecil)         | Menjalankan API, database sesi sewa & locker   |
+| Komponen                    | Spesifikasi                                            | Fungsi                                                                               |
+| --------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Microcontroller (ESP32)     | 1 unit (kontrol 4 relay + 4 sensor magnet)             | Polling backend, kontrol solenoid, baca sensor                                       |
+| Relay module                | 4 channel, aktif LOW                                   | Switch tiap solenoid                                                                 |
+| Solenoid door lock          | 12V, fail-secure, 4 unit                               | Mekanisme kunci elektronik tiap locker                                               |
+| Sensor magnet (reed switch) | 4 unit                                                 | Deteksi pintu terbuka/tertutup                                                       |
+| Adaptor 12V                 | Switching, arus cukup untuk 4 solenoid                 | Suplai daya solenoid                                                                 |
+| Step-down buck converter    | 12V → 5V                                               | Suplai daya ESP32 dari sumber sama                                                   |
+| Diode 1N4007                | 4-8 unit                                               | Proteksi flyback dari beban induktif solenoid                                        |
+| Terminal block              | Screw terminal 2 jalur                                 | Titik pembagi daya dari adaptor ke 2 jalur                                           |
+| Barcode/QR stiker           | ~~Cetak, 1 per locker~~ **Diganti layar TFT di bawah** | ~~Berisi link web unik ke halaman kontrol locker~~                                   |
+| Layar TFT IPS 1.3" 240×240  | 4 unit (1 per locker)                                  | Menampilkan QR dinamis (token berganti berkala), lihat `hardware/RAB.xlsx` item 1.12 |
+| Casing/rangka locker        | Lemari 4 pintu 2 susun                                 | Struktur fisik locker                                                                |
+| Server backend              | Hosting internet (VPS/cloud kecil)                     | Menjalankan API, database sesi sewa & locker                                         |
 
 Detail harga ada di RAB terpisah (`hardware/RAB.xlsx`).
 
@@ -129,7 +134,7 @@ Detail harga ada di RAB terpisah (`hardware/RAB.xlsx`).
 | Backend framework (mis. Node.js/Express)                  | Membangun REST API (sesi sewa, kode unik, push notification)   | ⏳ Belum diputuskan                                |
 | Database (mis. SQLite/MySQL/PostgreSQL)                   | Menyimpan data sesi sewa, status locker, hash kode unik        | ⏳ Belum diputuskan                                |
 | Hosting backend (VPS/cloud kecil)                         | Supaya backend bisa diakses dari internet                      | ⏳ Belum diputuskan                                |
-| HTML/CSS/JS atau framework ringan (mis. tanpa build step) | Halaman web pelanggan (sewa, kode unik)                        | ⏳ Belum diputuskan                                |
+| HTML/CSS/JS atau framework ringan (mis. tanpa build step) | Halaman web pelanggan (scan QR via kamera, sewa, kode unik)    | ⏳ Belum diputuskan                                |
 | Flutter SDK + Android Studio                              | App dashboard untuk Petugas Keamanan & Kebersihan              | ✅ Sudah diputuskan (reuse dari project dispenser) |
 | Firebase Cloud Messaging (FCM)                            | Push notification ke app petugas saat locker `needs_attention` | ⏳ Belum disetup                                   |
 | Git                                                       | Version control                                                | ⏳ Belum dikonfirmasi                              |
@@ -167,7 +172,6 @@ Detail harga ada di RAB terpisah (`hardware/RAB.xlsx`).
 | Breadboard                            | Uji coba rangkaian sebelum dirakit permanen                  |
 | Laptop + kabel USB                    | Upload firmware, development backend & web                   |
 | Isolasi/heat shrink tube              | Mengamankan sambungan kabel                                  |
-| Printer stiker/label                  | Mencetak barcode/QR untuk ditempel di tiap locker            |
 
 ---
 
@@ -178,20 +182,22 @@ Detail harga ada di RAB terpisah (`hardware/RAB.xlsx`).
 - **Rencana pembayaran masa depan** — saat ini prototipe kampus belum ada pembayaran; kalau nanti ditambahkan, alurnya direncanakan tetap dibayar di akhir sesi (saat mengakhiri sewa), bukan di muka
 - **Koneksi firmware-backend terputus** — karena firmware bergantung pada polling ke internet, perlu dipikirkan bagaimana perilaku locker kalau koneksi internet di titik locker terputus sementara (retry otomatis, indikator status ke user)
 - **Keamanan fisik solenoid fail-secure** — pastikan solenoid benar-benar default terkunci saat listrik mati
-- **Beban di server backend** — karena backend publik di internet, perlu dipikirkan proteksi dasar (rate limiting per IP, dsb) supaya tidak mudah disalahgunakan orang luar yang menemukan pola URL locker
+- **Beban di server backend** — karena backend publik di internet, perlu dipikirkan proteksi dasar (rate limiting per IP, dsb) supaya tidak mudah disalahgunakan orang luar; QR dinamis (token berotasi, lihat `docs/API.md` bagian 12) sudah menutup celah sewa jarak jauh, tapi endpoint tetap perlu proteksi dasar tambahan
+- **Rotasi QR vs masa berlaku token** — dua hal ini sengaja dipisah: layar locker tampilkan QR baru **tiap 5 detik** (locker `empty`) supaya sulit "dicuri lihat" dari jarak jauh, tapi token yang sama tetap **valid di backend selama 60 detik** sejak digenerate, supaya user yang baru scan masih sempat isi form nama & no HP tanpa keburu `TOKEN_EXPIRED`. Backend perlu simpan histori token singkat per locker (bukan cuma token yang sedang tampil) untuk validasi ini. Begitu locker `occupied`, token dibekukan (berhenti rotasi) sampai sesi selesai, supaya QR yang sama bisa dipakai scan ulang saat ambil barang
 - **Distribusi app petugas** — karena app Flutter ini cuma dipakai internal (Petugas Keamanan & Kebersihan), perlu dipikirkan cara instalasinya (APK dibagikan langsung, bukan lewat Play Store, mengingat skala masih prototipe kampus)
 
 ---
 
 ## 11. Status Proyek
 
-- [x] Konsep alur sewa tanpa akun (scan → form nama/no HP → kode unik → locker terbuka)
+- [x] Konsep alur sewa tanpa akun (scan QR dinamis → form nama/no HP → kode unik → locker terbuka)
 - [x] Model sesi seperti parkir: durasi dihitung dari waktu pakai
 - [x] Mekanisme kunci: solenoid + sensor magnet (auto-lock saat pintu tertutup)
 - [x] Alur ambil barang dengan pilihan lanjut/akhiri sewa
 - [x] Mitigasi pintu tidak tertutup: timeout 2 menit + push notification + resolve lewat app petugas
 - [x] Keputusan arsitektur firmware: ESP32 polling ke backend (karena backend hosting internet)
 - [x] Keputusan hybrid: sisi pelanggan web (tanpa app, tanpa akun), sisi Petugas Keamanan & Kebersihan pakai app Flutter (dashboard + resolve + push notification)
+- [x] QR dinamis (layar TFT + token berotasi) menggantikan stiker statis, scan dilakukan di dalam web
 - [x] Skala prototipe: 4 unit locker
 - [x] Stakeholder & teknik elisitasi teridentifikasi, materi wawancara sudah dibuat
 - [ ] Setup hosting backend & database
