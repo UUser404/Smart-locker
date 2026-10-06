@@ -21,14 +21,8 @@ app.use("/api/lockers", require("./src/routes/lockers"));
 app.use("/api/rentals", require("./src/routes/rentals"));
 app.use("/api/firmware", require("./src/routes/firmware"));
 const adminRouter = require("./src/routes/admin");
-console.log("=== ADMIN ROUTER ROUTES ===");
-adminRouter.stack.forEach((layer) => {
-  if (layer.route) {
-    const methods = Object.keys(layer.route.methods).join(",").toUpperCase();
-    console.log(`  ${methods} /api/admin${layer.route.path}`);
-  }
-});
-app.use("/api/admin", adminRouter);
+app.use("/api/admin", require("./src/routes/admin"));
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server jalan di port ${PORT}`);
