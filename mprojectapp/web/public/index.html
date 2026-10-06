@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Smart Locker</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="app">
+  <header class="app-header">
+    <h1>Smart Locker</h1>
+  </header>
+
+  <main id="app-main">
+
+    <!-- ===================== SCANNER ===================== -->
+    <section id="screen-scanner" class="screen active">
+      <p class="hint">Arahkan kamera ke QR di layar locker</p>
+      <div class="camera-box">
+        <video id="camera-video" playsinline autoplay muted></video>
+        <canvas id="camera-canvas" hidden></canvas>
+        <div class="scan-frame"></div>
+      </div>
+      <p id="camera-error" class="error-text" hidden></p>
+
+      <!-- Dev tools: belum ada backend & hardware asli, dipakai untuk demo -->
+      <details class="dev-tools">
+        <summary>Simulasi (dev only, hapus sebelum production)</summary>
+        <div class="dev-buttons">
+          <button data-sim="empty">Simulasikan: Locker Kosong</button>
+          <button data-sim="occupied">Simulasikan: Locker Terisi</button>
+          <button data-sim="needs_attention">Simulasikan: Perlu Perhatian</button>
+          <button data-sim="expired">Simulasikan: Token Kedaluwarsa</button>
+        </div>
+      </details>
+    </section>
+
+    <!-- ===================== NEEDS ATTENTION ===================== -->
+    <section id="screen-needs-attention" class="screen">
+      <div class="icon-warning">!</div>
+      <h2>Locker Sedang Tidak Bisa Dipakai</h2>
+      <p>Locker ini sedang dalam pengecekan petugas. Silakan coba locker lain atau kembali beberapa saat lagi.</p>
+      <button class="btn-secondary" data-action="back-to-scanner">Kembali ke Scanner</button>
+    </section>
+
+    <!-- ===================== TOKEN EXPIRED ===================== -->
+    <section id="screen-expired" class="screen">
+      <div class="icon-warning">⏱</div>
+      <h2>QR Sudah Kedaluwarsa</h2>
+      <p>QR di layar locker sudah berganti. Silakan scan ulang QR yang sedang tampil sekarang.</p>
+      <button class="btn-secondary" data-action="back-to-scanner">Scan Ulang</button>
+    </section>
+
+    <!-- ===================== FORM SEWA (locker kosong) ===================== -->
+    <section id="screen-rent-form" class="screen">
+      <h2>Sewa Locker <span id="rent-locker-id"></span></h2>
+      <p class="hint">Masukkan nama dan nomor HP kamu. Tidak perlu buat akun.</p>
+      <form id="form-rent">
+        <label>
+          Nama
+          <input type="text" id="input-nama" required autocomplete="name" />
+        </label>
+        <label>
+          Nomor HP
+          <input type="tel" id="input-no-hp" required autocomplete="tel" placeholder="08xxxxxxxxxx" />
+        </label>
+        <p id="rent-error" class="error-text" hidden></p>
+        <button type="submit" class="btn-primary">Buka Locker</button>
+      </form>
+    </section>
+
+    <!-- ===================== KODE UNIK (1x tampil) ===================== -->
+    <section id="screen-unique-code" class="screen">
+      <div class="icon-success">✓</div>
+      <h2>Locker Terbuka!</h2>
+      <p class="hint">Simpan kode ini baik-baik. Kode ini <strong>hanya ditampilkan sekali</strong> dan dibutuhkan untuk mengambil barangmu nanti.</p>
+      <div class="code-box">
+        <span id="unique-code-text"></span>
+        <button id="btn-copy-code" class="btn-copy" type="button">Salin</button>
+      </div>
+      <p id="copy-feedback" class="feedback-text" hidden>Tersalin!</p>
+      <button class="btn-primary" data-action="go-to-session">Lanjut</button>
+    </section>
+
+    <!-- ===================== SESI AKTIF (durasi berjalan) ===================== -->
+    <section id="screen-session-active" class="screen">
+      <h2>Locker <span id="session-locker-id"></span> Sedang Kamu Pakai</h2>
+      <div class="timer-box">
+        <span id="session-duration">00:00:00</span>
+      </div>
+      <p class="hint">Untuk mengambil barang, scan ulang QR di layar locker ini.</p>
+      <button class="btn-secondary" data-action="back-to-scanner">Scan untuk Ambil Barang</button>
+    </section>
+
+    <!-- ===================== INPUT KODE UNIK (locker terisi) ===================== -->
+    <section id="screen-access-code" class="screen">
+      <h2>Locker <span id="access-locker-id"></span> Sedang Disewa</h2>
+      <p class="hint">Kalau ini locker kamu, masukkan kode unik untuk membukanya.</p>
+      <form id="form-access">
+        <label>
+          Kode Unik
+          <input type="text" id="input-access-code" required autocomplete="off" maxlength="8" style="text-transform:uppercase" />
+        </label>
+        <p id="access-error" class="error-text" hidden></p>
+        <button type="submit" class="btn-primary">Buka Locker</button>
+      </form>
+      <button class="btn-link" data-action="back-to-scanner">Bukan locker saya</button>
+    </section>
+
+    <!-- ===================== PILIHAN LANJUT / AKHIRI ===================== -->
+    <section id="screen-access-choice" class="screen">
+      <div class="icon-success">✓</div>
+      <h2>Locker Terbuka</h2>
+      <p class="hint">Mau apa selanjutnya?</p>
+      <div class="choice-buttons">
+        <button class="btn-primary" data-action="choice-continue">Buka &amp; Lanjut Sewa</button>
+        <button class="btn-secondary" data-action="choice-end">Ambil Barang &amp; Akhiri Sewa</button>
+      </div>
+    </section>
+
+    <!-- ===================== SESI SELESAI ===================== -->
+    <section id="screen-session-ended" class="screen">
+      <div class="icon-success">✓</div>
+      <h2>Sewa Selesai</h2>
+      <p>Total durasi: <strong id="ended-duration"></strong></p>
+      <p class="hint">Terima kasih sudah menggunakan Smart Locker.</p>
+      <button class="btn-primary" data-action="back-to-scanner">Selesai</button>
+    </section>
+
+    <!-- ===================== ANTRIAN / KONFLIK ===================== -->
+    <section id="screen-queue" class="screen">
+      <div class="icon-warning">…</div>
+      <h2>Sedang Dalam Antrian</h2>
+      <p>Ada proses lain di locker ini beberapa detik lalu. Silakan coba scan ulang.</p>
+      <button class="btn-secondary" data-action="back-to-scanner">Scan Ulang</button>
+    </section>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
