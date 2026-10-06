@@ -1,6 +1,9 @@
 const {
     Timestamp
 } = require("firebase-admin/firestore");
+const {
+    notifyNeedsAttention
+} = require("./fcmService");
 
 const TIMEOUT_MS = 2 * 60 * 1000; // 2 menit
 
@@ -13,7 +16,7 @@ async function checkTimeouts(db) {
         .get();
 
     const batch = db.batch();
-    let count = 0;
+    const triggered = [];
 
     snapshot.forEach((doc) => {
         const locker = doc.data();
@@ -25,16 +28,19 @@ async function checkTimeouts(db) {
                 status: "needs_attention",
                 needsAttentionSince: Timestamp.now(),
             });
-            count++;
-            console.log(`[timeout] ${doc.id} → needs_attention`);
+            triggered.push(doc.id);
         }
     });
 
-    if (count > 0) {
+    if (triggered.length > 0) {
         await batch.commit();
+        for (const lockerId of triggered) {
+            console.log(`[timeout] ${lockerId} → needs_attention`);
+            await notifyNeedsAttention(lockerId);
+        }
     }
 
-    return count;
+    return triggered.length;
 }
 
 module.exports = {

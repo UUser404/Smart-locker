@@ -1,18 +1,31 @@
 const express = require("express");
-const { db } = require("../firebase");
+const {
+  db
+} = require("../firebase");
 const {
   generateUniqueCode,
   hashCode,
-  verifyCode,
+  verifyCode
 } = require("../services/uniqueCodeService");
-const { isTokenValid } = require("../services/qrTokenService");
+const {
+  isTokenValid
+} = require("../services/qrTokenService");
+const {
+  checkLock,
+  recordFailedAttempt,
+  resetAttempts,
+} = require("../services/rateLimiterService");
 
 const router = express.Router();
 
 // GET /api/lockers/:id/status?token=xxx
 router.get("/:id/status", async (req, res) => {
-  const { id: lockerId } = req.params;
-  const { token } = req.query;
+  const {
+    id: lockerId
+  } = req.params;
+  const {
+    token
+  } = req.query;
 
   if (!token) {
     return res.status(400).json({
@@ -27,7 +40,10 @@ router.get("/:id/status", async (req, res) => {
     if (!lockerDoc.exists) {
       return res
         .status(404)
-        .json({ status: "error", message: "LOCKER_NOT_FOUND" });
+        .json({
+          status: "error",
+          message: "LOCKER_NOT_FOUND"
+        });
     }
 
     const locker = lockerDoc.data();
@@ -45,19 +61,31 @@ router.get("/:id/status", async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ status: "error", message: "SERVER_ERROR" });
+    return res.status(500).json({
+      status: "error",
+      message: "SERVER_ERROR"
+    });
   }
 });
 
 // POST /api/lockers/:id/rent
 router.post("/:id/rent", async (req, res) => {
-  const { id: lockerId } = req.params;
-  const { nama, no_hp, token } = req.body;
+  const {
+    id: lockerId
+  } = req.params;
+  const {
+    nama,
+    no_hp,
+    token
+  } = req.body;
 
   if (!nama || !no_hp || !token) {
     return res
       .status(400)
-      .json({ status: "error", message: "Data kurang lengkap" });
+      .json({
+        status: "error",
+        message: "Data kurang lengkap"
+      });
   }
 
   const lockerRef = db.collection("lockers").doc(lockerId);
@@ -109,12 +137,18 @@ router.post("/:id/rent", async (req, res) => {
       };
     });
 
-    return res.status(200).json({ status: "ok", ...result });
+    return res.status(200).json({
+      status: "ok",
+      ...result
+    });
   } catch (err) {
     const code = err.message;
 
     if (code === "LOCKER_NOT_FOUND") {
-      return res.status(404).json({ status: "error", message: code });
+      return res.status(404).json({
+        status: "error",
+        message: code
+      });
     }
     if (code === "TOKEN_EXPIRED") {
       return res.status(400).json({
@@ -126,26 +160,50 @@ router.post("/:id/rent", async (req, res) => {
     if (code === "LOCKER_NOT_EMPTY") {
       return res
         .status(409)
-        .json({ status: "error", message: "Locker sudah terisi" });
+        .json({
+          status: "error",
+          message: "Locker sudah terisi"
+        });
     }
 
     console.error(err);
-    return res.status(500).json({ status: "error", message: "SERVER_ERROR" });
+    return res.status(500).json({
+      status: "error",
+      message: "SERVER_ERROR"
+    });
   }
 });
 
 // POST /api/lockers/:id/access
 router.post("/:id/access", async (req, res) => {
-  const { id: lockerId } = req.params;
-  const { code, action } = req.body;
+  const {
+    id: lockerId
+  } = req.params;
+  const {
+    code,
+    action
+  } = req.body;
 
   if (!code || !action) {
-    return res
-      .status(400)
-      .json({ status: "error", message: "Data kurang lengkap" });
+    return res.status(400).json({
+      status: "error",
+      message: "Data kurang lengkap"
+    });
   }
   if (!["continue", "end"].includes(action)) {
-    return res.status(400).json({ status: "error", message: "ACTION_INVALID" });
+    return res.status(400).json({
+      status: "error",
+      message: "ACTION_INVALID"
+    });
+  }
+
+  // STEP 1: cek apakah locker sedang terkunci
+  const lockStatus = await checkLock(lockerId);
+  if (lockStatus.locked) {
+    return res.status(429).json({
+      status: "error",
+      message: "Terlalu banyak percobaan, coba lagi nanti",
+    });
   }
 
   const lockerRef = db.collection("lockers").doc(lockerId);
@@ -164,19 +222,18 @@ router.post("/:id/access", async (req, res) => {
       if (!rentalDoc.exists) throw new Error("RENTAL_NOT_FOUND");
 
       const rental = rentalDoc.data();
-      if (!verifyCode(code, rental.uniqueCodeHash))
-        throw new Error("INVALID_CODE");
+      if (!verifyCode(code, rental.uniqueCodeHash)) throw new Error("INVALID_CODE");
 
       const now = new Date();
 
       if (action === "continue") {
         tx.update(lockerRef, {
           pendingCommand: "unlock",
-          unlockedSince: now,
+          unlockedSince: now
         });
         tx.update(rentalRef, {
           lastAccessAt: now,
-          accessAction: "continue",
+          accessAction: "continue"
         });
       } else {
         tx.update(lockerRef, {
@@ -191,27 +248,54 @@ router.post("/:id/access", async (req, res) => {
         });
       }
 
-      return { action, unlocked: true };
+      return {
+        action,
+        unlocked: true
+      };
     });
 
-    return res.status(200).json({ status: "ok", ...result });
+    // STEP 2: kode benar → reset counter
+    await resetAttempts(lockerId);
+    return res.status(200).json({
+      status: "ok",
+      ...result
+    });
   } catch (err) {
     const code = err.message;
 
-    if (code === "LOCKER_NOT_FOUND" || code === "RENTAL_NOT_FOUND") {
-      return res.status(404).json({ status: "error", message: code });
-    }
     if (code === "INVALID_CODE") {
-      return res
-        .status(400)
-        .json({ status: "error", message: "Kode tidak valid" });
+      // STEP 3: catat percobaan salah
+      const attempt = await recordFailedAttempt(lockerId);
+      if (attempt.locked) {
+        return res.status(429).json({
+          status: "error",
+          message: "Terlalu banyak percobaan, locker dikunci sementara",
+        });
+      }
+      return res.status(400).json({
+        status: "error",
+        message: "Kode tidak valid"
+      });
+    }
+
+    if (code === "LOCKER_NOT_FOUND" || code === "RENTAL_NOT_FOUND") {
+      return res.status(404).json({
+        status: "error",
+        message: code
+      });
     }
     if (code === "LOCKER_NOT_OCCUPIED" || code === "NO_ACTIVE_RENTAL") {
-      return res.status(409).json({ status: "error", message: code });
+      return res.status(409).json({
+        status: "error",
+        message: code
+      });
     }
 
     console.error(err);
-    return res.status(500).json({ status: "error", message: "SERVER_ERROR" });
+    return res.status(500).json({
+      status: "error",
+      message: "SERVER_ERROR"
+    });
   }
 });
 
