@@ -129,3 +129,4 @@ Desktop.ini
 google-services.json
 GoogleService-Info.plist
 serviceAccountKey.json
+firebase_options.dart
