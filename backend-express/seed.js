@@ -1,33 +1,48 @@
-const { initializeApp, cert } = require("firebase-admin/app");
-const { getFirestore, Timestamp } = require("firebase-admin/firestore");
-const serviceAccount = require("./serviceAccountKey.json");
+const { db } = require("./src/firebase");
+const { generateToken } = require("./src/services/qrTokenService");
 
-initializeApp({
-  credential: cert(serviceAccount),
-  projectId: serviceAccount.project_id,
-});
-
-const db = getFirestore();
+// Untuk testing: token berlaku 1 jam (bukan 60 detik), biar gampang
+const TEST_TOKEN_VALID_MS = 60 * 60 * 1000;
 
 async function seed() {
-  await db.collection("lockers").doc("locker1").set(
-    {
-      status: "empty",
-      currentQrToken: "TESTTOKEN",
-      qrTokenGeneratedAt: Timestamp.now(),
-      qrTokenFrozen: false,
-      currentRentalId: null,
-      pendingCommand: null,
-    },
-    { merge: true },
-  );
+  const now = Date.now();
+  const lockers = ["locker_01", "locker_02", "locker_03", "locker_04"];
 
-  console.log("Seed locker1 berhasil. Token: TESTTOKEN");
+  for (let i = 0; i < lockers.length; i++) {
+    const lockerId = lockers[i];
+    const lockerRef = db.collection("lockers").doc(lockerId);
+    const existing = await lockerRef.get();
+    const existingData = existing.exists ? existing.data() : {};
+
+    // Reset token tiap seed, supaya bisa langsung dipakai test
+    const token = generateToken();
+    const qrTokens = [
+      { token, generatedAt: now, expiresAt: now + TEST_TOKEN_VALID_MS },
+    ];
+
+    await lockerRef.set(
+      {
+        status: existingData.status === "occupied" ? "occupied" : "empty",
+        currentRentalId: existingData.currentRentalId || null,
+        qrTokens,
+        qrTokenFrozen: existingData.status === "occupied",
+        unlockedSince: null,
+        pendingCommand: null,
+        pendingEnd: false,
+        controllerId: "esp32_01",
+        lockerIndex: i,
+      },
+      { merge: true },
+    );
+
+    console.log(`${lockerId}: token=${token}`);
+  }
+
+  console.log("\nSeed selesai. Simpan token di atas untuk test.");
+  process.exit(0);
 }
 
-seed()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error("Seed gagal:", err);
-    process.exit(1);
-  });
+seed().catch((err) => {
+  console.error("Seed gagal:", err);
+  process.exit(1);
+});
