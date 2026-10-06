@@ -49,7 +49,6 @@ migrate_working_dir/
 # ------------------------------------------------------------
 # IntelliJ / IDE related
 # ------------------------------------------------------------
-# Wajib: abaikan folder .idea di seluruh level direktori
 **/.idea/
 .idea/
 *.iml
@@ -64,13 +63,11 @@ migrate_working_dir/
 # ------------------------------------------------------------
 # Flutter / Dart related
 # ------------------------------------------------------------
-# Wajib: abaikan .dart_tool/ dan build/ di seluruh level direktori
 **/.dart_tool/
 **/build/
 .dart_tool/
 build/
 
-# Cache & artefak Flutter/Dart lainnya
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .flutter-plugins-dependencies
@@ -78,6 +75,19 @@ build/
 .pub/
 /coverage/
 **/coverage/
+
+# ------------------------------------------------------------
+# Firebase configuration (sensitive)
+# ------------------------------------------------------------
+# File firebase_options.dart berisi konfigurasi Firebase (API key, project ID,
+# app ID, dll). Jangan di-commit ke repository publik.
+**/firebase_options.dart
+firebase_options.dart
+
+# File kredensial Firebase lainnya
+google-services.json
+GoogleService-Info.plist
+serviceAccountKey.json
 
 # ------------------------------------------------------------
 # Symbolication related
@@ -126,7 +136,3 @@ Desktop.ini
 *.key
 *.crt
 *.p12
-google-services.json
-GoogleService-Info.plist
-serviceAccountKey.json
-firebase_options.dart
