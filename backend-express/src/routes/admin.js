@@ -3,8 +3,12 @@ const {
     db
 } = require("../firebase");
 const {
-    requireAuth
+    requireAuth,
+    requireRole,
 } = require("../middleware/authMiddleware");
+const {
+    getRentalsReport
+} = require("../services/reportService");
 
 const router = express.Router();
 
@@ -23,11 +27,16 @@ router.get("/lockers", requireAuth, async (req, res) => {
             };
 
             if (data.status === "occupied" && data.currentRentalId) {
-                const rentalDoc = await db.collection("rentals").doc(data.currentRentalId).get();
+                const rentalDoc = await db
+                    .collection("rentals")
+                    .doc(data.currentRentalId)
+                    .get();
                 if (rentalDoc.exists) {
                     const rental = rentalDoc.data();
                     if (rental.startedAt) {
-                        item.elapsed_seconds = Math.floor((now - rental.startedAt.toMillis()) / 1000);
+                        item.elapsed_seconds = Math.floor(
+                            (now - rental.startedAt.toMillis()) / 1000
+                        );
                     }
                 }
             }
@@ -65,7 +74,8 @@ router.post("/lockers/:id/resolve", requireAuth, async (req, res) => {
             if (!doc.exists) throw new Error("LOCKER_NOT_FOUND");
 
             const locker = doc.data();
-            if (locker.status !== "needs_attention") throw new Error("NOT_NEEDS_ATTENTION");
+            if (locker.status !== "needs_attention")
+                throw new Error("NOT_NEEDS_ATTENTION");
 
             tx.update(lockerRef, {
                 status: "empty",
@@ -108,7 +118,7 @@ router.post("/lockers/:id/resolve", requireAuth, async (req, res) => {
     }
 });
 
-// POST /api/admin/register-device — TANPA auth (sesuai API.md, untuk first-time registration)
+// POST /api/admin/register-device — TANPA auth (first-time registration)
 router.post("/register-device", async (req, res) => {
     const {
         fcm_token,
@@ -116,14 +126,15 @@ router.post("/register-device", async (req, res) => {
     } = req.body;
 
     if (!fcm_token || !petugas_id) {
-        return res.status(400).json({
-            status: "error",
-            message: "Data kurang lengkap"
-        });
+        return res
+            .status(400)
+            .json({
+                status: "error",
+                message: "Data kurang lengkap"
+            });
     }
 
     try {
-        // Key = fcm_token (biar update kalau token sama, tidak numpuk)
         await db.collection("petugas_devices").doc(fcm_token).set({
             fcmToken: fcm_token,
             petugasId: petugas_id,
@@ -141,5 +152,24 @@ router.post("/register-device", async (req, res) => {
         });
     }
 });
+
+// GET /api/admin/reports/rentals — hanya admin
+router.get(
+    "/reports/rentals",
+    requireAuth,
+    requireRole("admin"),
+    async (req, res) => {
+        try {
+            const result = await getRentalsReport();
+            return res.status(200).json(result);
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({
+                status: "error",
+                message: "SERVER_ERROR"
+            });
+        }
+    }
+);
 
 module.exports = router;
