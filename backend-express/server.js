@@ -9,7 +9,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Health check
 app.get("/", (req, res) => {
   res.json({
     status: "ok",
@@ -17,10 +16,11 @@ app.get("/", (req, res) => {
   });
 });
 
-// Routes
+app.use("/api/auth", require("./src/routes/auth"));
 app.use("/api/lockers", require("./src/routes/lockers"));
 app.use("/api/rentals", require("./src/routes/rentals"));
 app.use("/api/firmware", require("./src/routes/firmware"));
+app.use("/api/admin", require("./src/routes/admin"));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
