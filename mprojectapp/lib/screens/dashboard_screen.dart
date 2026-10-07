@@ -5,7 +5,6 @@ import '../models/session.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/fcm_service.dart';
-import '../services/firestore_service.dart'; // ← TAMBAH
 import '../widgets/dashboard_widgets.dart';
 import 'login_screen.dart';
 
@@ -24,9 +23,13 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final ApiService _api = ApiService();
-  final FirestoreService _firestore = FirestoreService(); // ← TAMBAH
+  late final ApiService _api;
+  late final AuthService _authService;
 
+  List<Locker> _lockers = [];
+  bool _loading = true;
+  String? _error;
+  Timer? _pollTimer;
   StreamSubscription? _fgMessageSub;
   StreamSubscription? _openedAppSub;
 
@@ -34,11 +37,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
 
-    // HAPUS polling timer — tidak perlu lagi karena Firestore realtime.
-    // _pollTimer = Timer.periodic(...)  // ← DIHAPUS
+    _api = ApiService();
+    _api.setToken(widget.session.token);
+    _authService = AuthService(_api);
 
-    // Tetap perlu: FCM foreground → tampilkan snackbar.
-    // (data lockers sudah auto-update via stream, jadi cukup snackbar-nya)
+    _loadLockers();
+
+    // Polling 10 detik karena Express tidak realtime (bukan Firestore stream)
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      _loadLockers(silent: true);
+    });
+
     _fgMessageSub = widget.fcmService.onForegroundMessage.listen((message) {
       final lockerId = message.data['locker_id'];
       if (mounted) {
@@ -50,23 +59,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         );
       }
-      // Tidak perlu _loadLockers() — Firestore stream sudah handle.
+      _loadLockers(silent: true);
     });
 
     _openedAppSub = widget.fcmService.onMessageOpenedApp.listen((_) {
-      // Tidak perlu apa-apa — stream sudah realtime.
+      _loadLockers(silent: true);
     });
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _fgMessageSub?.cancel();
     _openedAppSub?.cancel();
     super.dispose();
   }
 
+  Future<void> _loadLockers({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+
+    try {
+      final lockers = await _api.fetchLockers();
+      if (!mounted) return;
+      setState(() {
+        _lockers = lockers;
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        if (!silent) _error = 'Gagal memuat data: $e';
+      });
+    }
+  }
+
   Future<void> _logout() async {
-    await AuthService(ApiService()).logout();
+    await _authService.logout();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
@@ -109,7 +144,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${locker.lockerId} ditandai kosong')),
       );
-      // Tidak perlu refresh — Firestore stream akan push update otomatis.
+      _loadLockers(silent: true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -146,51 +181,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         title: const Text('Dashboard Petugas'),
         actions: [
-          // Refresh button sekarang opsional — bisa dihilangkan.
-          // Tetap dipertahankan sebagai "paksa reload" (jarang dipakai).
           IconButton(
-            onPressed: () => setState(() {}),
+            onPressed: () => _loadLockers(),
             icon: const Icon(Icons.refresh),
           ),
         ],
       ),
-      body: StreamBuilder<List<Locker>>(
-        stream: _firestore.streamLockers(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting &&
-              !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return ListView(
-              children: [
-                const SizedBox(height: 80),
-                const Icon(Icons.error_outline, color: Colors.red, size: 40),
-                const SizedBox(height: 12),
-                Center(child: Text('Gagal memuat data: ${snapshot.error}')),
-              ],
-            );
-          }
-
-          final lockers = snapshot.data ?? [];
-          return RefreshIndicator(
-            onRefresh: () async {
-              // Firestore tidak butuh refresh manual, tapi kita trigger
-              // rebuild supaya user dapat feedback visual.
-              setState(() {});
-            },
-            child: _buildBody(lockers),
-          );
-        },
-      ),
+      body: RefreshIndicator(onRefresh: _loadLockers, child: _buildBody()),
     );
   }
 
-  int _countByStatus(List<Locker> lockers, LockerStatus s) =>
-      lockers.where((l) => l.status == s).length;
+  int _countByStatus(LockerStatus s) =>
+      _lockers.where((l) => l.status == s).length;
 
-  Widget _buildBody(List<Locker> lockers) {
+  Widget _buildBody() {
+    if (_loading && _lockers.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null && _lockers.isEmpty) {
+      return ListView(
+        children: [
+          const SizedBox(height: 80),
+          const Icon(Icons.error_outline, color: Colors.red, size: 40),
+          const SizedBox(height: 12),
+          Center(child: Text(_error!)),
+        ],
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
@@ -205,25 +224,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
           cards: [
             StatCard(
               label: 'Kosong',
-              value: '${_countByStatus(lockers, LockerStatus.empty)}',
+              value: '${_countByStatus(LockerStatus.empty)}',
               icon: Icons.lock_open,
               color: Colors.green,
             ),
             StatCard(
               label: 'Terisi',
-              value: '${_countByStatus(lockers, LockerStatus.occupied)}',
+              value: '${_countByStatus(LockerStatus.occupied)}',
               icon: Icons.lock_outline,
               color: Colors.orange,
             ),
             StatCard(
               label: 'Perlu Perhatian',
-              value: '${_countByStatus(lockers, LockerStatus.needsAttention)}',
+              value: '${_countByStatus(LockerStatus.needsAttention)}',
               icon: Icons.warning_amber_rounded,
               color: Colors.red,
             ),
             StatCard(
               label: 'Total Locker',
-              value: '${lockers.length}',
+              value: '${_lockers.length}',
               icon: Icons.grid_view_rounded,
               color: Colors.indigo,
             ),
@@ -235,13 +254,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
-        if (lockers.isEmpty)
+        if (_lockers.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
             child: Center(child: Text('Belum ada data locker')),
           )
         else
-          ...lockers.map(_buildLockerTile),
+          ..._lockers.map(_buildLockerTile),
       ],
     );
   }
@@ -274,7 +293,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           locker.status == LockerStatus.occupied
               ? 'Durasi berjalan: ${locker.displayDuration}'
               : locker.status == LockerStatus.needsAttention
-              ? 'Sejak ${locker.needsAttentionSince}'
+              ? 'Sejak ${locker.needsAttentionSinceLabel}'
               : 'Siap disewa',
         ),
         trailing: locker.status == LockerStatus.needsAttention

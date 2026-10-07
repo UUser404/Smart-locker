@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class RentalRecord {
   final String rentalId;
   final String lockerId;
@@ -8,9 +6,7 @@ class RentalRecord {
   final DateTime startedAt;
   final DateTime? endedAt;
   final int? totalDurationSeconds;
-  final String status;
-  final DateTime? lastAccessAt;
-  final String? accessAction;
+  final String status; // 'active'|'completed'|'expired'
 
   RentalRecord({
     required this.rentalId,
@@ -21,8 +17,6 @@ class RentalRecord {
     this.endedAt,
     this.totalDurationSeconds,
     this.status = 'active',
-    this.lastAccessAt,
-    this.accessAction,
   });
 
   Duration? get duration {
@@ -44,27 +38,13 @@ class RentalRecord {
     return '${d.inSeconds}s';
   }
 
-  // ===== FIREBASE =====
-  factory RentalRecord.fromFirestore(DocumentSnapshot doc) {
-    final d = (doc.data() as Map<String, dynamic>?) ?? {};
-    final startedAt = d['startedAt'];
-    return RentalRecord(
-      rentalId: (d['rentalId'] as String?) ?? doc.id,
-      lockerId: d['lockerId'] as String? ?? '',
-      nama: d['nama'] as String? ?? '',
-      noHp: d['noHp'] as String? ?? '',
-      startedAt: startedAt is Timestamp
-          ? startedAt.toDate()
-          : DateTime.now(), // fallback aman kalau data korup
-      endedAt: (d['endedAt'] as Timestamp?)?.toDate(),
-      totalDurationSeconds: d['totalDurationSeconds'] as int?,
-      status: d['status'] as String? ?? 'active',
-      lastAccessAt: (d['lastAccessAt'] as Timestamp?)?.toDate(),
-      accessAction: d['accessAction'] as String?,
-    );
-  }
-
-  // ===== JSON (untuk REST fallback) =====
+  /// Dari response Express `/api/admin/reports/rentals`:
+  /// {
+  ///   "rental_id": "...", "locker_id": "...", "nama": "...",
+  ///   "no_hp": "0812****89",  // di-mask oleh backend
+  ///   "started_at": "...", "ended_at": null,
+  ///   "total_duration_seconds": null, "status": "active"
+  /// }
   factory RentalRecord.fromJson(Map<String, dynamic> json) => RentalRecord(
     rentalId: json['rental_id'] as String,
     lockerId: json['locker_id'] as String,
@@ -75,13 +55,14 @@ class RentalRecord {
         ? null
         : DateTime.parse(json['ended_at'] as String),
     totalDurationSeconds: json['total_duration_seconds'] as int?,
+    status: json['status'] as String? ?? 'active',
   );
 }
 
 class RentalStats {
   final int totalRentals;
   final int avgDurationSeconds;
-  final String? busiestLockerId; // ← nullable (sesuai pemakaian)
+  final String? busiestLockerId; // nullable — kadang backend kirim null
 
   RentalStats({
     required this.totalRentals,

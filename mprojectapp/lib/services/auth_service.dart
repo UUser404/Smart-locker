@@ -19,6 +19,7 @@ class AuthService {
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kPrefSession);
+    _api.setToken(null);
   }
 
   Future<AuthSession?> getSavedSession() async {
@@ -26,7 +27,12 @@ class AuthService {
     final raw = prefs.getString(_kPrefSession);
     if (raw == null) return null;
     try {
-      return AuthSession.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+      final session = AuthSession.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
+      // Restore token ke ApiService supaya request berikutnya ter-autentikasi
+      _api.setToken(session.token);
+      return session;
     } catch (_) {
       // Data korup/format lama -> anggap tidak ada sesi tersimpan.
       return null;

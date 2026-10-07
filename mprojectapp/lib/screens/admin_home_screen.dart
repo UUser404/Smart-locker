@@ -4,7 +4,6 @@ import '../models/session.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/fcm_service.dart';
-import '../services/firestore_service.dart'; // ← TAMBAH
 import '../widgets/dashboard_widgets.dart';
 import 'login_screen.dart';
 
@@ -18,28 +17,61 @@ class AdminHomeScreen extends StatefulWidget {
 }
 
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
-  final FirestoreService _firestore = FirestoreService(); // ← TAMBAH
+  late final ApiService _api;
+  late final AuthService _authService;
 
-  // Hapus: _stats, _rentals, _loading, _error, _loadReports()
-  // Semua di-handle oleh StreamBuilder + computeStats
+  RentalStats? _stats;
+  List<RentalRecord> _rentals = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _api = ApiService();
+    _api.setToken(widget.session.token);
+    _authService = AuthService(_api);
+    _loadReports();
+  }
+
+  Future<void> _loadReports() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final (stats, rentals) = await _api.fetchRentalReports();
+      if (!mounted) return;
+      setState(() {
+        _stats = stats;
+        _rentals = rentals;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Gagal memuat laporan: $e';
+      });
+    }
+  }
 
   Future<void> _logout() async {
-    final api = ApiService();
-    await AuthService(api).logout();
+    await _authService.logout();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (_) => LoginScreen(
-          authService: AuthService(api),
-          fcmService: FcmService(api),
+          authService: AuthService(ApiService()),
+          fcmService: FcmService(ApiService()),
         ),
       ),
       (route) => false,
     );
   }
 
-  int _activeCount(List<RentalRecord> rentals) =>
-      rentals.where((r) => r.endedAt == null).length;
+  int get _activeCount => _rentals.where((r) => r.endedAt == null).length;
 
   String _formatDateTime(DateTime dt) {
     final local = dt.toLocal();
@@ -56,44 +88,29 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       appBar: AppBar(
         title: const Text('Dashboard Admin'),
         actions: [
-          IconButton(
-            onPressed: () => setState(() {}), // paksa rebuild (opsional)
-            icon: const Icon(Icons.refresh),
-          ),
+          IconButton(onPressed: _loadReports, icon: const Icon(Icons.refresh)),
         ],
       ),
-      body: StreamBuilder<List<RentalRecord>>(
-        stream: _firestore.streamRentals(limit: 200),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting &&
-              !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return ListView(
-              children: [
-                const SizedBox(height: 80),
-                const Icon(Icons.error_outline, color: Colors.red, size: 40),
-                const SizedBox(height: 12),
-                Center(child: Text('Gagal memuat laporan: ${snapshot.error}')),
-              ],
-            );
-          }
-
-          final rentals = snapshot.data ?? [];
-          final stats = _firestore.computeStats(rentals);
-
-          return RefreshIndicator(
-            onRefresh: () async => setState(() {}),
-            child: _buildBody(rentals, stats),
-          );
-        },
-      ),
+      body: RefreshIndicator(onRefresh: _loadReports, child: _buildBody()),
     );
   }
 
-  Widget _buildBody(List<RentalRecord> rentals, RentalStats stats) {
+  Widget _buildBody() {
+    if (_loading && _rentals.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null && _rentals.isEmpty) {
+      return ListView(
+        children: [
+          const SizedBox(height: 80),
+          const Icon(Icons.error_outline, color: Colors.red, size: 40),
+          const SizedBox(height: 12),
+          Center(child: Text(_error!)),
+        ],
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -104,25 +121,25 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           onLogout: _logout,
         ),
         const SizedBox(height: 16),
-        _buildStatsGrid(stats, rentals),
+        if (_stats != null) _buildStatsGrid(_stats!),
         const SizedBox(height: 20),
         const Text(
           'Riwayat Sewa',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
-        if (rentals.isEmpty)
+        if (_rentals.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
             child: Center(child: Text('Belum ada riwayat sewa')),
           )
         else
-          ...rentals.map(_buildRentalTile),
+          ..._rentals.map(_buildRentalTile),
       ],
     );
   }
 
-  Widget _buildStatsGrid(RentalStats stats, List<RentalRecord> rentals) {
+  Widget _buildStatsGrid(RentalStats stats) {
     return StatGrid(
       cards: [
         StatCard(
@@ -133,7 +150,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         ),
         StatCard(
           label: 'Sedang Aktif',
-          value: '${_activeCount(rentals)}',
+          value: '$_activeCount',
           icon: Icons.lock_open,
           color: Colors.orange,
         ),
