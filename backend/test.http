@@ -1,0 +1,9 @@
+POST http://127.0.0.1:5001/smart-locker-project-45bac/asia-southeast2/rentLocker
+Content-Type: application/json
+
+{
+  "lockerId": "locker_01",
+  "qrToken": "TEST1234",
+  "nama": "Galuh",
+  "noHp": "08123456789"
+}
