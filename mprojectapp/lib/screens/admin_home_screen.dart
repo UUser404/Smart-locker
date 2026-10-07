@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import '../models/rental_record.dart';
 import '../models/session.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
+import '../services/fcm_service.dart';
+import '../services/firestore_service.dart'; // ← TAMBAH
+import '../widgets/dashboard_widgets.dart';
+import 'login_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final AuthSession session;
@@ -13,41 +18,28 @@ class AdminHomeScreen extends StatefulWidget {
 }
 
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
-  final ApiService _api = ApiService();
+  final FirestoreService _firestore = FirestoreService(); // ← TAMBAH
 
-  RentalStats? _stats;
-  List<RentalRecord> _rentals = [];
-  bool _loading = true;
-  String? _error;
+  // Hapus: _stats, _rentals, _loading, _error, _loadReports()
+  // Semua di-handle oleh StreamBuilder + computeStats
 
-  @override
-  void initState() {
-    super.initState();
-    _loadReports();
+  Future<void> _logout() async {
+    final api = ApiService();
+    await AuthService(api).logout();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => LoginScreen(
+          authService: AuthService(api),
+          fcmService: FcmService(api),
+        ),
+      ),
+      (route) => false,
+    );
   }
 
-  Future<void> _loadReports() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
-    try {
-      final (stats, rentals) = await _api.fetchRentalReports();
-      if (!mounted) return;
-      setState(() {
-        _stats = stats;
-        _rentals = rentals;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = 'Gagal memuat laporan: $e';
-      });
-    }
-  }
+  int _activeCount(List<RentalRecord> rentals) =>
+      rentals.where((r) => r.endedAt == null).length;
 
   String _formatDateTime(DateTime dt) {
     final local = dt.toLocal();
@@ -62,65 +54,100 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Laporan — ${widget.session.nama}'),
+        title: const Text('Dashboard Admin'),
         actions: [
-          IconButton(onPressed: _loadReports, icon: const Icon(Icons.refresh)),
+          IconButton(
+            onPressed: () => setState(() {}), // paksa rebuild (opsional)
+            icon: const Icon(Icons.refresh),
+          ),
         ],
       ),
-      body: RefreshIndicator(onRefresh: _loadReports, child: _buildBody()),
+      body: StreamBuilder<List<RentalRecord>>(
+        stream: _firestore.streamRentals(limit: 200),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return ListView(
+              children: [
+                const SizedBox(height: 80),
+                const Icon(Icons.error_outline, color: Colors.red, size: 40),
+                const SizedBox(height: 12),
+                Center(child: Text('Gagal memuat laporan: ${snapshot.error}')),
+              ],
+            );
+          }
+
+          final rentals = snapshot.data ?? [];
+          final stats = _firestore.computeStats(rentals);
+
+          return RefreshIndicator(
+            onRefresh: () async => setState(() {}),
+            child: _buildBody(rentals, stats),
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildBody() {
-    if (_loading && _rentals.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_error != null && _rentals.isEmpty) {
-      return ListView(
-        children: [
-          const SizedBox(height: 80),
-          const Icon(Icons.error_outline, color: Colors.red, size: 40),
-          const SizedBox(height: 12),
-          Center(child: Text(_error!)),
-        ],
-      );
-    }
-
+  Widget _buildBody(List<RentalRecord> rentals, RentalStats stats) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (_stats != null) _buildStatsRow(_stats!),
+        ProfileHeader(
+          nama: widget.session.nama,
+          roleLabel: 'Admin',
+          roleColor: Colors.indigo,
+          onLogout: _logout,
+        ),
+        const SizedBox(height: 16),
+        _buildStatsGrid(stats, rentals),
         const SizedBox(height: 20),
         const Text(
           'Riwayat Sewa',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
-        ..._rentals.map(_buildRentalTile),
+        if (rentals.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: Text('Belum ada riwayat sewa')),
+          )
+        else
+          ...rentals.map(_buildRentalTile),
       ],
     );
   }
 
-  Widget _buildStatsRow(RentalStats stats) {
-    return Row(
-      children: [
-        Expanded(
-          child: _StatCard(label: 'Total Sewa', value: '${stats.totalRentals}'),
+  Widget _buildStatsGrid(RentalStats stats, List<RentalRecord> rentals) {
+    return StatGrid(
+      cards: [
+        StatCard(
+          label: 'Total Sewa',
+          value: '${stats.totalRentals}',
+          icon: Icons.receipt_long,
+          color: Colors.indigo,
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatCard(
-            label: 'Rata-rata Durasi',
-            value: stats.displayAvgDuration,
-          ),
+        StatCard(
+          label: 'Sedang Aktif',
+          value: '${_activeCount(rentals)}',
+          icon: Icons.lock_open,
+          color: Colors.orange,
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatCard(
-            label: 'Paling Sering',
-            value: stats.busiestLockerId ?? '-',
-          ),
+        StatCard(
+          label: 'Rata-rata Durasi',
+          value: stats.displayAvgDuration,
+          icon: Icons.timer_outlined,
+          color: Colors.teal,
+        ),
+        StatCard(
+          label: 'Paling Sering',
+          value: stats.busiestLockerId ?? '-',
+          icon: Icons.trending_up,
+          color: Colors.purple,
         ),
       ],
     );
@@ -132,51 +159,30 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: isActive ? Colors.orange : Colors.grey.shade300,
+          backgroundColor: isActive
+              ? Colors.orange.shade100
+              : Colors.grey.shade200,
           child: Icon(
             isActive ? Icons.lock_open : Icons.lock_outline,
-            color: isActive ? Colors.white : Colors.black54,
+            color: isActive ? Colors.orange.shade800 : Colors.black54,
             size: 20,
           ),
         ),
-        title: Text('${r.lockerId} — ${r.nama}'),
+        title: Row(
+          children: [
+            Expanded(child: Text('${r.lockerId} — ${r.nama}')),
+            StatusBadge(
+              text: isActive ? 'Aktif' : 'Selesai',
+              color: isActive ? Colors.orange : Colors.green,
+            ),
+          ],
+        ),
         subtitle: Text(
           isActive
               ? 'Mulai ${_formatDateTime(r.startedAt)} · masih berjalan'
               : '${_formatDateTime(r.startedAt)} - ${_formatDateTime(r.endedAt!)} · ${r.displayDuration}',
         ),
         trailing: Text(r.noHp, style: const TextStyle(fontSize: 12)),
-      ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _StatCard({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 11, color: Colors.grey),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
       ),
     );
   }

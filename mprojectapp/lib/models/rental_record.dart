@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class RentalRecord {
   final String rentalId;
   final String lockerId;
@@ -6,6 +8,9 @@ class RentalRecord {
   final DateTime startedAt;
   final DateTime? endedAt;
   final int? totalDurationSeconds;
+  final String status;
+  final DateTime? lastAccessAt;
+  final String? accessAction;
 
   RentalRecord({
     required this.rentalId,
@@ -15,37 +20,68 @@ class RentalRecord {
     required this.startedAt,
     this.endedAt,
     this.totalDurationSeconds,
+    this.status = 'active',
+    this.lastAccessAt,
+    this.accessAction,
   });
 
-  factory RentalRecord.fromJson(Map<String, dynamic> json) {
+  Duration? get duration {
+    if (totalDurationSeconds != null) {
+      return Duration(seconds: totalDurationSeconds!);
+    }
+    if (endedAt != null) {
+      return endedAt!.difference(startedAt);
+    }
+    return null;
+  }
+
+  /// String terformat untuk ditampilkan di UI.
+  String get displayDuration {
+    final d = duration;
+    if (d == null) return '-';
+    if (d.inHours > 0) return '${d.inHours}j ${d.inMinutes % 60}m';
+    if (d.inMinutes > 0) return '${d.inMinutes}m';
+    return '${d.inSeconds}s';
+  }
+
+  // ===== FIREBASE =====
+  factory RentalRecord.fromFirestore(DocumentSnapshot doc) {
+    final d = (doc.data() as Map<String, dynamic>?) ?? {};
+    final startedAt = d['startedAt'];
     return RentalRecord(
-      rentalId: json['rental_id'] as String,
-      lockerId: json['locker_id'] as String,
-      nama: json['nama'] as String,
-      noHp: json['no_hp'] as String,
-      startedAt: DateTime.parse(json['started_at'] as String),
-      endedAt: json['ended_at'] != null
-          ? DateTime.parse(json['ended_at'] as String)
-          : null,
-      totalDurationSeconds: json['total_duration_seconds'] as int?,
+      rentalId: (d['rentalId'] as String?) ?? doc.id,
+      lockerId: d['lockerId'] as String? ?? '',
+      nama: d['nama'] as String? ?? '',
+      noHp: d['noHp'] as String? ?? '',
+      startedAt: startedAt is Timestamp
+          ? startedAt.toDate()
+          : DateTime.now(), // fallback aman kalau data korup
+      endedAt: (d['endedAt'] as Timestamp?)?.toDate(),
+      totalDurationSeconds: d['totalDurationSeconds'] as int?,
+      status: d['status'] as String? ?? 'active',
+      lastAccessAt: (d['lastAccessAt'] as Timestamp?)?.toDate(),
+      accessAction: d['accessAction'] as String?,
     );
   }
 
-  String get displayDuration {
-    if (totalDurationSeconds == null) return '-';
-    final d = Duration(seconds: totalDurationSeconds!);
-    final h = d.inHours;
-    final m = d.inMinutes.remainder(60);
-    if (h > 0) return '${h}j ${m}m';
-    return '${m}m';
-  }
+  // ===== JSON (untuk REST fallback) =====
+  factory RentalRecord.fromJson(Map<String, dynamic> json) => RentalRecord(
+    rentalId: json['rental_id'] as String,
+    lockerId: json['locker_id'] as String,
+    nama: json['nama'] as String,
+    noHp: json['no_hp'] as String,
+    startedAt: DateTime.parse(json['started_at'] as String),
+    endedAt: json['ended_at'] == null
+        ? null
+        : DateTime.parse(json['ended_at'] as String),
+    totalDurationSeconds: json['total_duration_seconds'] as int?,
+  );
 }
 
-/// Ringkasan statistik untuk kartu di bagian atas layar laporan admin.
 class RentalStats {
   final int totalRentals;
-  final double avgDurationSeconds;
-  final String? busiestLockerId;
+  final int avgDurationSeconds;
+  final String? busiestLockerId; // ← nullable (sesuai pemakaian)
 
   RentalStats({
     required this.totalRentals,
@@ -53,19 +89,17 @@ class RentalStats {
     this.busiestLockerId,
   });
 
-  factory RentalStats.fromJson(Map<String, dynamic> json) {
-    return RentalStats(
-      totalRentals: json['total_rentals'] as int,
-      avgDurationSeconds: (json['avg_duration_seconds'] as num).toDouble(),
-      busiestLockerId: json['busiest_locker_id'] as String?,
-    );
+  String get displayAvgDuration {
+    if (avgDurationSeconds <= 0) return '-';
+    final d = Duration(seconds: avgDurationSeconds);
+    if (d.inHours > 0) return '${d.inHours}j ${d.inMinutes % 60}m';
+    if (d.inMinutes > 0) return '${d.inMinutes} menit';
+    return '${d.inSeconds}s';
   }
 
-  String get displayAvgDuration {
-    final d = Duration(seconds: avgDurationSeconds.round());
-    final h = d.inHours;
-    final m = d.inMinutes.remainder(60);
-    if (h > 0) return '${h}j ${m}m';
-    return '${m}m';
-  }
+  factory RentalStats.fromJson(Map<String, dynamic> json) => RentalStats(
+    totalRentals: json['total_rentals'] as int,
+    avgDurationSeconds: json['avg_duration_seconds'] as int,
+    busiestLockerId: json['busiest_locker_id'] as String?,
+  );
 }
