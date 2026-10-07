@@ -1,0 +1,38 @@
+Folder PATH listing
+Volume serial number is 1427-BAA7
+C:.
+¦   daftar_file.txt
+¦   LICENSE
+¦   README.md
+¦   structure_repo.md
+¦   
++---docs
+¦   ¦   API.md
+¦   ¦   DEVELOPMENT_GUIDE.md
+¦   ¦   Format_SKPL.docx
+¦   ¦   
+¦   +---dokumentasi flutter
+¦   ¦       DOKUMENTASI_PROGRESS.md
+¦   ¦       PROPOSAL_API_ADDITION.md
+¦   ¦       README.md
+¦   ¦       README_WEB.md
+¦   ¦       
+¦   +---elisitasi
+¦       ¦   Berita Acara Wawancara.docx
+¦       ¦   Wawancara IT Jaringan Kampus.docx
+¦       ¦   Wawancara Keamanan Kebersihan.docx
+¦       ¦   Wawancara Pengelola Aset Kampus.docx
+¦       ¦   Wawancara Pengguna Akhir.docx
+¦       ¦   
+¦       +---Hasil Elisitasi
+¦               Wawancara Sarpras Kampus.docx
+¦               Wawancara Sarpras Kampus.m4a.mp4
+¦               Wawancara Security Kampus.docx
+¦               Wawancara Security Kampus.m4a.mpeg
+¦               
++---firmware
+¦       documentation.md
+¦       
++---hardware
+        RAB PROJECT SMART LOCKER.xlsx
+        
