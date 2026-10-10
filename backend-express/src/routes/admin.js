@@ -4,15 +4,18 @@ const {
 } = require("../firebase");
 const {
     requireAuth,
-    requireRole,
+    requireRole
 } = require("../middleware/authMiddleware");
 const {
     getRentalsReport
 } = require("../services/reportService");
+const tokenStore = require("../services/tokenStoreService");
 
 const router = express.Router();
 
-// GET /api/admin/lockers — butuh login
+// ============================================================
+// GET /api/admin/lockers — list semua locker
+// ============================================================
 router.get("/lockers", requireAuth, async (req, res) => {
     try {
         const snapshot = await db.collection("lockers").get();
@@ -31,6 +34,7 @@ router.get("/lockers", requireAuth, async (req, res) => {
                     .collection("rentals")
                     .doc(data.currentRentalId)
                     .get();
+
                 if (rentalDoc.exists) {
                     const rental = rentalDoc.data();
                     if (rental.startedAt) {
@@ -60,7 +64,9 @@ router.get("/lockers", requireAuth, async (req, res) => {
     }
 });
 
-// POST /api/admin/lockers/:id/resolve — butuh login
+// ============================================================
+// POST /api/admin/lockers/:id/resolve
+// ============================================================
 router.post("/lockers/:id/resolve", requireAuth, async (req, res) => {
     const {
         id: lockerId
@@ -74,8 +80,9 @@ router.post("/lockers/:id/resolve", requireAuth, async (req, res) => {
             if (!doc.exists) throw new Error("LOCKER_NOT_FOUND");
 
             const locker = doc.data();
-            if (locker.status !== "needs_attention")
+            if (locker.status !== "needs_attention") {
                 throw new Error("NOT_NEEDS_ATTENTION");
+            }
 
             tx.update(lockerRef, {
                 status: "empty",
@@ -92,6 +99,10 @@ router.post("/lockers/:id/resolve", requireAuth, async (req, res) => {
                 new_status: "empty"
             };
         });
+
+        // Update in-memory token store
+        tokenStore.setStatus(lockerId, "empty");
+        tokenStore.setFrozen(lockerId, false);
 
         return res.status(200).json({
             status: "ok",
@@ -118,7 +129,9 @@ router.post("/lockers/:id/resolve", requireAuth, async (req, res) => {
     }
 });
 
-// POST /api/admin/register-device — TANPA auth (first-time registration)
+// ============================================================
+// POST /api/admin/register-device — tanpa auth (first-time)
+// ============================================================
 router.post("/register-device", async (req, res) => {
     const {
         fcm_token,
@@ -153,7 +166,9 @@ router.post("/register-device", async (req, res) => {
     }
 });
 
+// ============================================================
 // GET /api/admin/reports/rentals — hanya admin
+// ============================================================
 router.get(
     "/reports/rentals",
     requireAuth,
@@ -169,6 +184,31 @@ router.get(
                 message: "SERVER_ERROR"
             });
         }
+    }
+);
+
+// ============================================================
+// GET /api/admin/debug/tokens — DEV ONLY (hapus sebelum production)
+// ============================================================
+router.get(
+    "/debug/tokens",
+    requireAuth,
+    requireRole("admin"),
+    async (req, res) => {
+        const all = tokenStore.getAll();
+        const result = {};
+
+        for (const [lockerId, locker] of Object.entries(all)) {
+            result[lockerId] = {
+                status: locker.status,
+                frozen: locker.frozen,
+                lockerIndex: locker.lockerIndex,
+                controllerId: locker.controllerId,
+                latestToken: tokenStore.getLatestToken(lockerId),
+            };
+        }
+
+        return res.status(200).json(result);
     }
 );
 

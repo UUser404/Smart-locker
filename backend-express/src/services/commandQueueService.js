@@ -52,6 +52,58 @@ async function collectQrTokens(db, controllerId) {
 
     return tokens;
 }
+const {
+    db: defaultDb
+} = require("../firebase");
+const tokenStore = require("./tokenStoreService");
+
+async function consumeCommands(db, controllerId) {
+    const snapshot = await db
+        .collection("lockers")
+        .where("controllerId", "==", controllerId)
+        .get();
+
+    const commands = [];
+    const batch = db.batch();
+
+    snapshot.forEach((doc) => {
+        const locker = doc.data();
+        if (locker.pendingCommand === "unlock") {
+            commands.push({
+                locker_index: locker.lockerIndex,
+                action: "unlock",
+                pulse_hold: true,
+            });
+            batch.update(doc.ref, {
+                pendingCommand: null
+            });
+        }
+    });
+
+    if (commands.length > 0) {
+        await batch.commit();
+    }
+
+    return commands;
+}
+
+async function collectQrTokens(db, controllerId) {
+    const tokens = {};
+    const all = tokenStore.getAll();
+
+    for (const [lockerId, locker] of Object.entries(all)) {
+        if (locker.controllerId === controllerId) {
+            tokens[String(locker.lockerIndex)] = tokenStore.getLatestToken(lockerId);
+        }
+    }
+
+    return tokens;
+}
+
+module.exports = {
+    consumeCommands,
+    collectQrTokens
+};
 
 module.exports = {
     consumeCommands,

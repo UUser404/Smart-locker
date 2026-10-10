@@ -5,11 +5,9 @@ const {
 const {
   generateUniqueCode,
   hashCode,
-  verifyCode
+  verifyCode,
 } = require("../services/uniqueCodeService");
-const {
-  isTokenValid
-} = require("../services/qrTokenService");
+const tokenStore = require("../services/tokenStoreService");
 const {
   checkLock,
   recordFailedAttempt,
@@ -46,8 +44,7 @@ router.get("/:id/status", async (req, res) => {
         });
     }
 
-    const locker = lockerDoc.data();
-    if (!isTokenValid(locker.qrTokens, token)) {
+    if (!tokenStore.isTokenValid(lockerId, token)) {
       return res.status(400).json({
         status: "error",
         code: "TOKEN_EXPIRED",
@@ -55,6 +52,7 @@ router.get("/:id/status", async (req, res) => {
       });
     }
 
+    const locker = lockerDoc.data();
     return res.status(200).json({
       locker_id: lockerId,
       status: locker.status,
@@ -88,6 +86,15 @@ router.post("/:id/rent", async (req, res) => {
       });
   }
 
+  // Validasi token dari in-memory store SEBELUM masuk transaction
+  if (!tokenStore.isTokenValid(lockerId, token)) {
+    return res.status(400).json({
+      status: "error",
+      code: "TOKEN_EXPIRED",
+      message: "QR sudah kedaluwarsa, silakan scan ulang",
+    });
+  }
+
   const lockerRef = db.collection("lockers").doc(lockerId);
 
   try {
@@ -98,8 +105,6 @@ router.post("/:id/rent", async (req, res) => {
       const locker = lockerDoc.data();
 
       if (locker.status !== "empty") throw new Error("LOCKER_NOT_EMPTY");
-      if (!isTokenValid(locker.qrTokens, token))
-        throw new Error("TOKEN_EXPIRED");
 
       const uniqueCode = generateUniqueCode();
       const uniqueCodeHash = hashCode(uniqueCode);
@@ -137,6 +142,10 @@ router.post("/:id/rent", async (req, res) => {
       };
     });
 
+    // Update in-memory store setelah transaksi sukses
+    tokenStore.setStatus(lockerId, "occupied");
+    tokenStore.setFrozen(lockerId, true);
+
     return res.status(200).json({
       status: "ok",
       ...result
@@ -148,13 +157,6 @@ router.post("/:id/rent", async (req, res) => {
       return res.status(404).json({
         status: "error",
         message: code
-      });
-    }
-    if (code === "TOKEN_EXPIRED") {
-      return res.status(400).json({
-        status: "error",
-        code: "TOKEN_EXPIRED",
-        message: "QR sudah kedaluwarsa, silakan scan ulang",
       });
     }
     if (code === "LOCKER_NOT_EMPTY") {
@@ -185,10 +187,12 @@ router.post("/:id/access", async (req, res) => {
   } = req.body;
 
   if (!code || !action) {
-    return res.status(400).json({
-      status: "error",
-      message: "Data kurang lengkap"
-    });
+    return res
+      .status(400)
+      .json({
+        status: "error",
+        message: "Data kurang lengkap"
+      });
   }
   if (!["continue", "end"].includes(action)) {
     return res.status(400).json({
@@ -197,7 +201,7 @@ router.post("/:id/access", async (req, res) => {
     });
   }
 
-  // STEP 1: cek apakah locker sedang terkunci
+  // Cek rate limit
   const lockStatus = await checkLock(lockerId);
   if (lockStatus.locked) {
     return res.status(429).json({
@@ -222,18 +226,20 @@ router.post("/:id/access", async (req, res) => {
       if (!rentalDoc.exists) throw new Error("RENTAL_NOT_FOUND");
 
       const rental = rentalDoc.data();
-      if (!verifyCode(code, rental.uniqueCodeHash)) throw new Error("INVALID_CODE");
+      if (!verifyCode(code, rental.uniqueCodeHash)) {
+        throw new Error("INVALID_CODE");
+      }
 
       const now = new Date();
 
       if (action === "continue") {
         tx.update(lockerRef, {
           pendingCommand: "unlock",
-          unlockedSince: now
+          unlockedSince: now,
         });
         tx.update(rentalRef, {
           lastAccessAt: now,
-          accessAction: "continue"
+          accessAction: "continue",
         });
       } else {
         tx.update(lockerRef, {
@@ -254,7 +260,6 @@ router.post("/:id/access", async (req, res) => {
       };
     });
 
-    // STEP 2: kode benar → reset counter
     await resetAttempts(lockerId);
     return res.status(200).json({
       status: "ok",
@@ -264,7 +269,6 @@ router.post("/:id/access", async (req, res) => {
     const code = err.message;
 
     if (code === "INVALID_CODE") {
-      // STEP 3: catat percobaan salah
       const attempt = await recordFailedAttempt(lockerId);
       if (attempt.locked) {
         return res.status(429).json({
@@ -272,10 +276,12 @@ router.post("/:id/access", async (req, res) => {
           message: "Terlalu banyak percobaan, locker dikunci sementara",
         });
       }
-      return res.status(400).json({
-        status: "error",
-        message: "Kode tidak valid"
-      });
+      return res
+        .status(400)
+        .json({
+          status: "error",
+          message: "Kode tidak valid"
+        });
     }
 
     if (code === "LOCKER_NOT_FOUND" || code === "RENTAL_NOT_FOUND") {

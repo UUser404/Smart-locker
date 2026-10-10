@@ -4,11 +4,11 @@ const {
 } = require("../firebase");
 const {
     consumeCommands,
-    collectQrTokens
+    collectQrTokens,
 } = require("../services/commandQueueService");
+const tokenStore = require("../services/tokenStoreService");
 const {
-    Timestamp,
-    FieldValue
+    Timestamp
 } = require("firebase-admin/firestore");
 
 const router = express.Router();
@@ -47,10 +47,12 @@ router.post("/:controllerId/report", async (req, res) => {
     } = req.body;
 
     if (locker_index === undefined || !event) {
-        return res.status(400).json({
-            status: "error",
-            message: "Data kurang lengkap"
-        });
+        return res
+            .status(400)
+            .json({
+                status: "error",
+                message: "Data kurang lengkap"
+            });
     }
     if (!["opened", "closed"].includes(event)) {
         return res.status(400).json({
@@ -68,28 +70,29 @@ router.post("/:controllerId/report", async (req, res) => {
             .get();
 
         if (lockerSnap.empty) {
-            return res.status(404).json({
-                status: "error",
-                message: "LOCKER_NOT_FOUND"
-            });
+            return res
+                .status(404)
+                .json({
+                    status: "error",
+                    message: "LOCKER_NOT_FOUND"
+                });
         }
 
         const lockerRef = lockerSnap.docs[0].ref;
+        const lockerId = lockerSnap.docs[0].id;
         const locker = lockerSnap.docs[0].data();
 
-        // Event opened: catat saja (mungkin untuk log nanti)
+        // Event opened: cukup catat timestamp
         if (event === "opened") {
             await lockerRef.update({
-                unlockedSince: Timestamp.now(),
+                unlockedSince: Timestamp.now()
             });
             return res.status(200).json({
                 status: "ok"
             });
         }
 
-        // Event closed: ini yang penting
-        const now = Timestamp.now();
-
+        // Event closed: finalisasi atau re-lock
         if (locker.pendingEnd === true && locker.currentRentalId) {
             // Finalisasi sesi
             const rentalRef = db.collection("rentals").doc(locker.currentRentalId);
@@ -98,7 +101,9 @@ router.post("/:controllerId/report", async (req, res) => {
 
             const startedAt = rental.startedAt.toDate();
             const endedAt = new Date();
-            const totalDurationSeconds = Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000);
+            const totalDurationSeconds = Math.floor(
+                (endedAt.getTime() - startedAt.getTime()) / 1000
+            );
 
             await rentalRef.update({
                 status: "completed",
@@ -115,13 +120,20 @@ router.post("/:controllerId/report", async (req, res) => {
                 pendingEnd: false,
             });
 
-            console.log(`[firmware] sesi ${rentalRef.id} selesai, ${totalDurationSeconds}s`);
+            // === Update in-memory token store ===
+            tokenStore.setStatus(lockerId, "empty");
+            tokenStore.setFrozen(lockerId, false);
+
+            console.log(
+                `[firmware] sesi ${rentalRef.id} selesai, ${totalDurationSeconds}s`
+            );
         } else {
             // Cukup kunci lagi, sesi tetap jalan
             await lockerRef.update({
                 unlockedSince: null,
                 pendingCommand: null,
             });
+            // Status locker tetap occupied, tidak ada perubahan token store
         }
 
         return res.status(200).json({
