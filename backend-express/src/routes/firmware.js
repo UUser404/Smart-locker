@@ -1,5 +1,8 @@
 const express = require("express");
 const {
+    requireDeviceAuth
+} = require("../middleware/deviceAuthMiddleware");
+const {
     db
 } = require("../firebase");
 const {
@@ -14,7 +17,7 @@ const {
 const router = express.Router();
 
 // GET /api/firmware/:controllerId/poll
-router.get("/:controllerId/poll", async (req, res) => {
+router.get("/:controllerId/poll", requireDeviceAuth, async (req, res) => {
     const {
         controllerId
     } = req.params;
@@ -37,7 +40,7 @@ router.get("/:controllerId/poll", async (req, res) => {
 });
 
 // POST /api/firmware/:controllerId/report
-router.post("/:controllerId/report", async (req, res) => {
+router.post("/:controllerId/report", requireDeviceAuth, async (req, res) => {
     const {
         controllerId
     } = req.params;
