@@ -11,13 +11,14 @@
 
 #define BUILD_MODE BUILD_MODE_DEVELOPMENT
 
-// Bisa override manual — kalau hardware cuma ada 1, biarkan 1
 #if BUILD_MODE == BUILD_MODE_PRODUCTION
 #define ACTIVE_LOCKERS 4
 #define ENABLE_TFT true
+#define ENABLE_DOOR_SENSOR true
 #else
 #define ACTIVE_LOCKERS 1
-#define ENABLE_TFT true // set false kalau TFT belum ada
+#define ENABLE_TFT false
+#define ENABLE_DOOR_SENSOR false
 #endif
 
 // ============================================================
@@ -34,6 +35,8 @@
 
 #define POLL_INTERVAL_MS 2000
 #define HTTP_TIMEOUT_MS 10000
+
+#define DEVICE_TOKEN "70cd4fbd2fd930b1844d7dcff3bb9270"
 
 // ============================================================
 // KONFIGURASI LOCKER
