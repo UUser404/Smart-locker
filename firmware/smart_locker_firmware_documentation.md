@@ -4,14 +4,10 @@ Firmware ESP32 untuk sistem Smart Locker IoT. Berkomunikasi dengan backend Expre
 
 ## Status Saat Ini
 
-| Modul            | Status     | Catatan                                       |
-| ---------------- | ---------- | --------------------------------------------- |
-| `wifi_client`    | ✅ Tested  | Koneksi ke WiFi kampus + reconnect            |
-| `backend_poller` | ✅ Tested  | Poll `GET /poll` tiap 2 detik, parse JSON     |
-| `lock_control`   | ⚠️ Written | Butuh relay, belum test hardware              |
-| `door_sensor`    | ⚠️ Written | Tested via jumper manual                      |
-| `event_reporter` | ⚠️ Written | Belum test end-to-end (quota Firestore habis) |
-| `tft_render`     | ⚠️ Written | Dry-run compile OK, butuh TFT ST7789          |
+| Komponen         | Status    | Keterangan                                        |
+| ---------------- | --------- | ------------------------------------------------- |
+| `backend_poller` | ✅ Tested | Sync `POST /sync` tiap 2 detik, parse JSON        |
+| `event_reporter` | ✅ Tested | Integrated into `/sync` (state dikirim bersamaan) |
 
 ## Hardware Target
 
@@ -86,11 +82,23 @@ pio device monitor    # buka Serial Monitor
 
 ## Catatan
 
-- **Token QR format:** `{locker_id}.{token}`, contoh: `locker_01.9f3a1c`
-- **Poll interval:** 2 detik (kontrak `API.md`)
-- **Token rotation:** 5 detik (backend rotator, in-memory)
-- **TLS:** pakai `setInsecure()` untuk dev, wajib `setCACert()` untuk production
-- **Backend URL:** `https://smart-locker-backend-a2ck.onrender.com/api`
+- **Endpoint firmware:** `POST /api/firmware/esp32_01/sync` (gabungan poll + report)
+- **Request body:** `{ "lockers": [{ "index", "door_open", "solenoid_on" }] }`
+- **Response:** `{ "commands": [...], "qr_tokens": {...} }`
+- **Transition detection:** Backend mendeteksi transisi pintu dari perubahan state
+
+## Endpoint Firmware: /sync
+
+Firmware menggunakan **`POST /api/firmware/esp32_01/sync`** yang menggabungkan
+polling perintah dan pelaporan state pintu dalam 1 request per 2 detik.
+
+**Keuntungan:**
+
+- Hemat ~50% request (sebelumnya 2 endpoint: /poll + /report)
+- ESP32 tidak perlu track "kapan harus report" — cukup kirim state
+- Backend yang urus deteksi transisi (state centered di backend)
+
+**Endpoint lama** (`/poll` dan `/report`) tetap ada untuk backward compatibility.
 
 ## Autentikasi Device
 
