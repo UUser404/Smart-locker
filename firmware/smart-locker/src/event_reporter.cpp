@@ -28,6 +28,7 @@ bool report_door_event(int lockerIndex, const char *event) {
     return false;
   }
 
+  http.addHeader("X-Device-Token", DEVICE_TOKEN);
   http.addHeader("Content-Type", "application/json");
   int httpCode = http.POST(payload);
   http.end();

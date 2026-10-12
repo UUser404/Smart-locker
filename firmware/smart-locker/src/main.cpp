@@ -24,7 +24,7 @@ void setup() {
 
   Serial.println();
   Serial.println("================================");
-  Serial.println("Smart Locker Firmware v3.0");
+  Serial.println("Smart Locker Firmware v3.1 (sync)");
   Serial.println("================================");
   Serial.printf("[Sys] Build mode: %s\n", BUILD_MODE == BUILD_MODE_PRODUCTION
                                               ? "PRODUCTION"
@@ -43,7 +43,10 @@ void setup() {
   }
 
   lock_init();
+
+#if ENABLE_DOOR_SENSOR
   door_init();
+#endif
 
 #if ENABLE_TFT
   Serial.println("[Sys] Init TFT...");
@@ -60,7 +63,7 @@ void setup() {
     waitingForClose[i] = false;
   }
 
-  Serial.println("[Sys] Setup selesai. Mulai polling.");
+  Serial.println("[Sys] Setup selesai. Mulai sync.");
 }
 
 // ============================================================
@@ -75,35 +78,50 @@ void loop() {
     return;
   }
 
-  // Cek perubahan pintu untuk semua locker yang aktif
-  for (int i = 0; i < ACTIVE_LOCKERS; i++) {
-    int transition = door_check_transition(i);
-    if (transition == 1) {
-      Serial.printf("[Door] Locker %d: pintu terbuka\n", i);
-    } else if (transition == -1) {
-      Serial.printf("[Door] Locker %d: pintu tertutup\n", i);
-      lock_lock(i);
-      report_door_event(i, "closed");
-      waitingForClose[i] = false;
-    }
-  }
-
-  // Poll backend tiap POLL_INTERVAL_MS
+  // Sync backend tiap POLL_INTERVAL_MS
   if (millis() - lastPollMs < POLL_INTERVAL_MS)
     return;
   lastPollMs = millis();
 
   digitalWrite(STATUS_LED_PIN, !digitalRead(STATUS_LED_PIN));
 
-  PollResult poll = backend_poll();
-  if (!poll.success)
+  // ============================================================
+  // Baca state pintu + solenoid semua locker
+  // ============================================================
+  bool doorOpen[NUM_LOCKERS] = {false};
+  bool solenoidOn[NUM_LOCKERS] = {false};
+
+  for (int i = 0; i < NUM_LOCKERS; i++) {
+    if (i < ACTIVE_LOCKERS) {
+#if ENABLE_DOOR_SENSOR
+      doorOpen[i] = door_is_open(i);
+#else
+      // Dev mode: pin floating, kirim false supaya backend tidak deteksi
+      // transisi palsu
+      doorOpen[i] = false;
+#endif
+      solenoidOn[i] = lock_is_unlocked(i);
+    } else {
+      // Locker belum di-wire: kirim state default
+      doorOpen[i] = false;
+      solenoidOn[i] = false;
+    }
+  }
+
+  // ============================================================
+  // Kirim ke backend via /sync
+  // ============================================================
+  PollResult sync = backend_sync(doorOpen, solenoidOn);
+  if (!sync.success)
     return;
 
-  Serial.println("[Poll] OK");
+  Serial.println("[Sync] OK");
 
+  // ============================================================
   // Proses commands
+  // ============================================================
   for (int i = 0; i < NUM_LOCKERS; i++) {
-    if (poll.hasCommand[i]) {
+    if (sync.hasCommand[i]) {
       if (i < ACTIVE_LOCKERS) {
         Serial.printf("[Cmd] Locker %d: UNLOCK\n", i);
         lock_open(i);
@@ -114,22 +132,22 @@ void loop() {
     }
   }
 
-  // Simpan token terbaru ke cache (tidak langsung render)
+  // ============================================================
+  // Update token terbaru
+  // ============================================================
   for (int i = 0; i < ACTIVE_LOCKERS; i++) {
-    if (poll.qrTokens[i].length() > 0 &&
-        poll.qrTokens[i] != lastRenderedToken[i]) {
-      Serial.printf("[QR] Locker %d token: %s\n", i, poll.qrTokens[i].c_str());
-      lastRenderedToken[i] = poll.qrTokens[i];
+    if (sync.qrTokens[i].length() > 0 &&
+        sync.qrTokens[i] != lastRenderedToken[i]) {
+      Serial.printf("[QR] Locker %d token: %s\n", i, sync.qrTokens[i].c_str());
+      lastRenderedToken[i] = sync.qrTokens[i];
     }
   }
 
 #if ENABLE_TFT
-  // Round-robin: render 1 TFT per siklus poll
-  // Kalau token locker ini berbeda dari yang sudah dirender, update.
+  // Round-robin: render 1 TFT per siklus sync
   {
     int idx = nextTftToRender;
     if (idx < ACTIVE_LOCKERS && lastRenderedToken[idx].length() > 0) {
-      // Hanya render kalau benar-benar berubah — hindari redraw berulang
       String lockerId = "locker_0" + String(idx + 1);
       tft_render_qr(idx, lockerId.c_str(), lastRenderedToken[idx].c_str());
     }

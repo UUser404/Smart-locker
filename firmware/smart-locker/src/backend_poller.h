@@ -12,6 +12,9 @@ struct PollResult {
   String qrTokens[NUM_LOCKERS];
 };
 
-PollResult backend_poll(const char *url_override = nullptr);
+// Kirim state locker + terima commands + qr_tokens
+// lockers: array state per locker (door_open, solenoid_on)
+PollResult backend_sync(const bool doorOpen[NUM_LOCKERS],
+                        const bool solenoidOn[NUM_LOCKERS]);
 
 #endif
