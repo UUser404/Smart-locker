@@ -4,14 +4,14 @@ Firmware ESP32 untuk sistem Smart Locker IoT. Berkomunikasi dengan backend Expre
 
 ## Status Saat Ini
 
-| Modul | Status | Catatan |
-|---|---|---|
-| `wifi_client` | ✅ Tested | Koneksi ke WiFi kampus + reconnect |
-| `backend_poller` | ✅ Tested | Poll `GET /poll` tiap 2 detik, parse JSON |
-| `lock_control` | ⚠️ Written | Butuh relay, belum test hardware |
-| `door_sensor` | ⚠️ Written | Tested via jumper manual |
+| Modul            | Status     | Catatan                                       |
+| ---------------- | ---------- | --------------------------------------------- |
+| `wifi_client`    | ✅ Tested  | Koneksi ke WiFi kampus + reconnect            |
+| `backend_poller` | ✅ Tested  | Poll `GET /poll` tiap 2 detik, parse JSON     |
+| `lock_control`   | ⚠️ Written | Butuh relay, belum test hardware              |
+| `door_sensor`    | ⚠️ Written | Tested via jumper manual                      |
 | `event_reporter` | ⚠️ Written | Belum test end-to-end (quota Firestore habis) |
-| `tft_render` | ⚠️ Written | Dry-run compile OK, butuh TFT ST7789 |
+| `tft_render`     | ⚠️ Written | Dry-run compile OK, butuh TFT ST7789          |
 
 ## Hardware Target
 
@@ -21,18 +21,31 @@ Firmware ESP32 untuk sistem Smart Locker IoT. Berkomunikasi dengan backend Expre
 - **Sensor:** 4x limit switch / reed magnet
 - **Solenoid:** 4x 12V fail-secure
 
+### Wajib untuk Sensor (pin 34-39)
+
+GPIO 34, 35, 36, 39 adalah **input-only** dan tidak punya internal pull-up.
+Setiap sensor magnet / limit switch harus dipasang **resistor pull-up 10kΩ**
+dari pin sensor ke 3.3V. Tanpa resistor ini, pin floating dan pembacaan
+random (flapping).
+
+Diagram:
+3.3V ──┬── 10kΩ ──┬── GPIO 34
+│ │
+│ Sensor (ke GND saat pintu tertutup)
+│
+
 ## Pin Mapping
 
-| Fungsi | Pin |
-|---|---|
-| Relay 0-3 | 25, 26, 27, 32 |
-| Sensor 0-3 | 34, 35, 36, 39 |
-| Status LED | 2 |
-| TFT SCLK (shared) | 18 |
-| TFT MOSI (shared) | 23 |
-| TFT BLK (shared) | 19 |
-| TFT CS 0-3 | 4, 13, 14, 33 |
-| TFT DC 0-3 | 16, 17, 21, 22 |
+| Fungsi            | Pin            |
+| ----------------- | -------------- |
+| Relay 0-3         | 25, 26, 27, 32 |
+| Sensor 0-3        | 34, 35, 36, 39 |
+| Status LED        | 2              |
+| TFT SCLK (shared) | 18             |
+| TFT MOSI (shared) | 23             |
+| TFT BLK (shared)  | 19             |
+| TFT CS 0-3        | 4, 13, 14, 33  |
+| TFT DC 0-3        | 16, 17, 21, 22 |
 
 ## Struktur Kode
 
@@ -79,6 +92,19 @@ pio device monitor    # buka Serial Monitor
 - **TLS:** pakai `setInsecure()` untuk dev, wajib `setCACert()` untuk production
 - **Backend URL:** `https://smart-locker-backend-a2ck.onrender.com/api`
 
+## Autentikasi Device
+
+Firmware mengirim header `X-Device-Token` di setiap request ke endpoint
+`/api/firmware/*`. Token harus cocok dengan field `authToken` di
+Firestore collection `controllers/{controller_id}`.
+
+Token di-seed via `backend-express/seedController.js`. Cara pakai:
+
+```bash
+cd backend-express
+node seedController.js
+# Output: [seed] authToken: 70cd4fbd2fd930b1844d7dcff3bb9270
+
 ## Progress & TODO
 
 - [x] WiFi client (connect + reconnect)
@@ -91,3 +117,4 @@ pio device monitor    # buka Serial Monitor
 - [ ] Multi-locker scaling test (4 locker simultan)
 - [ ] Watchdog + brownout protection
 - [ ] Device auth token (untuk production)
+```
