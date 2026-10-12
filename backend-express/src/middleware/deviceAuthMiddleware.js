@@ -53,6 +53,15 @@ async function requireDeviceAuth(req, res, next) {
         }
 
         if (headerToken !== storedToken) {
+            console.log("[deviceAuth] MISMATCH");
+            console.log("  header : [" + headerToken + "] len=" + headerToken.length);
+            console.log("  stored : [" + storedToken + "] len=" + storedToken.length);
+            for (let i = 0; i < Math.max(headerToken.length, storedToken.length); i++) {
+                if (headerToken[i] !== storedToken[i]) {
+                    console.log(`  beda di index ${i}: header='${headerToken[i]}' (code ${headerToken.charCodeAt(i)}) vs stored='${storedToken[i]}' (code ${storedToken.charCodeAt(i)})`);
+                    break;
+                }
+            }
             return res.status(401).json({
                 status: "error",
                 message: "INVALID_DEVICE_TOKEN",
