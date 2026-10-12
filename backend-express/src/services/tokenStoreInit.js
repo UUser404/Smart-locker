@@ -2,9 +2,9 @@ const {
     db
 } = require("../firebase");
 const tokenStore = require("./tokenStoreService");
+const lockerStateStore = require("./lockerStateStore");
 
 // Fallback: daftar locker default kalau Firestore tidak bisa dibaca.
-// Ini hanya untuk development ketika quota habis.
 const FALLBACK_LOCKERS = [{
         id: "locker_01",
         index: 0
@@ -32,12 +32,16 @@ async function tryInitFromFirestore() {
 
     for (const doc of snapshot.docs) {
         const data = doc.data();
+
         tokenStore.initLocker(doc.id, {
             status: data.status || "empty",
             frozen: data.qrTokenFrozen || false,
             lockerIndex: data.lockerIndex,
             controllerId: data.controllerId,
         });
+
+        lockerStateStore.init(doc.id);
+
         count++;
     }
 
@@ -52,6 +56,8 @@ function initFallback() {
             lockerIndex: l.index,
             controllerId: CONTROLLER_ID,
         });
+
+        lockerStateStore.init(l.id);
     }
     console.log(`[tokenStore] Fallback initialized ${FALLBACK_LOCKERS.length} lockers`);
 }
@@ -68,13 +74,11 @@ async function initTokenStore() {
         console.error(`[tokenStore] Firestore read failed: ${err.message}`);
         console.log("[tokenStore] Using fallback locker list (dev mode)");
 
-        // Isi fallback hanya kalau store masih kosong
         const existing = tokenStore.getAll();
         if (Object.keys(existing).length === 0) {
             initFallback();
         }
 
-        // Jadwalkan retry kalau belum ada
         if (!retryTimer) {
             console.log("[tokenStore] Will retry in 60s...");
             retryTimer = setInterval(async () => {
