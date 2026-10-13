@@ -5,15 +5,31 @@ const {
     notifyNeedsAttention
 } = require("./fcmService");
 
-const TIMEOUT_MS = 2 * 60 * 1000; // 2 menit
+const TIMEOUT_MS = 2 * 60 * 1000;
+let lastQuotaErrorLog = 0;
+const QUOTA_LOG_INTERVAL_MS = 5 * 60 * 1000; // log tiap 5 menit kalau quota habis
 
 async function checkTimeouts(db) {
     const now = Date.now();
 
-    const snapshot = await db
-        .collection("lockers")
-        .where("status", "==", "occupied")
-        .get();
+    let snapshot;
+    try {
+        snapshot = await db
+            .collection("lockers")
+            .where("status", "==", "occupied")
+            .get();
+    } catch (err) {
+        // Kalau quota habis, jangan spam log
+        if (err.code === 8 || (err.message && err.message.includes("Quota exceeded"))) {
+            const nowMs = Date.now();
+            if (nowMs - lastQuotaErrorLog > QUOTA_LOG_INTERVAL_MS) {
+                console.log("[timeout] quota habis, skip sampai reset");
+                lastQuotaErrorLog = nowMs;
+            }
+            return 0;
+        }
+        throw err; // error lain, biarkan scheduler log
+    }
 
     const batch = db.batch();
     const triggered = [];
