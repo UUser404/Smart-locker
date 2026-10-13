@@ -4,7 +4,7 @@
 #include <ArduinoJson.h>
 
 // Ganti dengan SSID WiFi Anda (pastikan tidak ada password atau kosongkan jika terbuka)
-const char *ssid = "Ruang Kuliah 01";
+const char *ssid = "Ruang Kuliah 01                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          ";
 const char *password = "";
 
 // Menggunakan protokol http:// agar kompatibel dengan pembatasan SSL di server gratis Render
