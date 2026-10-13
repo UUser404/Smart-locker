@@ -411,9 +411,7 @@ Histori masalah & solusinya:
 - [ ] Integrasi FCM di app Flutter petugas (Reza)
 - [ ] Ganti password default admin/petugas1
 - [ ] Merge `feature/firmware` ke `main` lewat Pull Request
-- [ ] Hapus endpoint debug (`/api/admin/debug/tokens`) sebelum production final
-
----
+- [x] Hapus endpoint debug (`/api/admin/debug/tokens`) — **selesai** (commit `d1733d1`)
 
 ## 9. Keputusan Desain
 
