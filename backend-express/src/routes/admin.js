@@ -187,29 +187,4 @@ router.get(
     }
 );
 
-// ============================================================
-// GET /api/admin/debug/tokens — DEV ONLY (hapus sebelum production)
-// ============================================================
-router.get(
-    "/debug/tokens",
-    requireAuth,
-    requireRole("admin"),
-    async (req, res) => {
-        const all = tokenStore.getAll();
-        const result = {};
-
-        for (const [lockerId, locker] of Object.entries(all)) {
-            result[lockerId] = {
-                status: locker.status,
-                frozen: locker.frozen,
-                lockerIndex: locker.lockerIndex,
-                controllerId: locker.controllerId,
-                latestToken: tokenStore.getLatestToken(lockerId),
-            };
-        }
-
-        return res.status(200).json(result);
-    }
-);
-
 module.exports = router;
