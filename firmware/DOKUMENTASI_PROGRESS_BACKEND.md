@@ -142,6 +142,24 @@ Response field: `stats` (total_rentals, avg_duration_seconds, busiest_locker_id)
 
 **Endpoint baru:** `POST /api/firmware/:controllerId/sync`
 
+### Fase 6 — Anti Alarm Fatigue (FCM Polish)
+
+Mengacu pada materi PBP 6 tentang mencegah alarm fatigue:
+
+- **Jeda (cooldown)**: max 1 notif per locker per 10 menit
+- **Collapse key**: `locker_{lockerId}` — notif baru override notif lama
+- **Time to Live (TTL)**: 30 menit — notif basi tidak dikirim
+- **Prioritas tinggi**: mode hemat daya Android tetap kirim
+- **Isi dinamis**: durasi terbuka dihitung real-time ("pintu terbuka sejak 5 menit lalu")
+- **Channel Android**: `smart_locker_alert` (sound + vibrate)
+- **Cooldown reset**: saat petugas resolve locker, cooldown di-reset supaya masalah baru langsung dinotifikasi
+
+**Test:**
+
+- `sent=3, failed=0` — kirim ke 3 device petugas berhasil
+- `skip (cooldown, 598s lagi)` — panggilan kedua di-skip dalam 10 menit
+- `cooldown di-reset` → `sent=3, failed=0` — reset bekerja
+
 **Request body:**
 
 ```json
