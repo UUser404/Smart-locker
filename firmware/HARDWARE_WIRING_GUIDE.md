@@ -1,10 +1,16 @@
 # Hardware Wiring Guide — Smart Locker
 
-Panduan lengkap _wiring_ & _assembly_ 4-unit Smart Locker untuk tim _hardware_. Ikuti urutan dari _bench test_ sampai _full assembly_.
+Panduan lengkap wiring & assembly **2-unit** Smart Locker untuk tim
+hardware. Ikuti urutan dari bench test sampai full assembly.
 
 - **PIC:** Alfian (hardware & elektronika)
 - **Konsumen:** ESP32 firmware (Galuh)
-- **Target:** 4 locker, 1 ESP32 controller
+- **Target:** **2 locker** (locker_01, locker_02), 1 ESP32 controller
+
+> **Catatan revisi:** Prototype final menggunakan **2 locker**. Firmware
+> tetap support hingga 4 locker di level arsitektur (array pin sudah
+> disiapkan), tapi yang diaktifkan via `ACTIVE_LOCKERS 2`. Pin index
+> 2-3 tidak dipakai — biarkan kosong.
 
 ---
 
@@ -12,19 +18,19 @@ Panduan lengkap _wiring_ & _assembly_ 4-unit Smart Locker untuk tim _hardware_. 
 
 ### Wajib
 
-| Komponen                     | Jumlah | Spesifikasi                         | Keterangan                     |
-| ---------------------------- | ------ | ----------------------------------- | ------------------------------ |
-| ESP32 DevKit                 | 1      | 38-pin, ESP32-D0WDQ6                | Sudah ada                      |
-| Relay module                 | 1      | 4-channel, aktif LOW, 5V            |                                |
-| Solenoid door lock           | 4      | 12V, fail-secure                    | 1 per locker                   |
-| Sensor magnet / limit switch | 4      | NC atau NO, 2 kabel                 | 1 per locker                   |
-| Resistor                     | 4      | 10 kΩ, 1/4 W                        | **Wajib** pull-up untuk sensor |
-| TFT IPS ST7789               | 4      | 1.3", 240×240, SPI                  | 1 per locker, Pak Siswo beli   |
-| Adaptor 12V                  | 1      | ≥ 3 A (4 solenoid × 0.6 A + margin) | Suplai utama                   |
-| Buck converter               | 1      | 12V → 5V, ≥ 2 A                     | Untuk ESP32 + relay            |
-| Diode 1N4007                 | 4-8    | 1 A, 1000 V                         | Flyback protection solenoid    |
-| Terminal block               | 2-3    | 2 atau 4 jalur                      | Pembagi daya                   |
-| Kabel jumper                 | 40+    | Male-male, male-female              |                                |
+| Komponen                     | Jumlah | Spesifikasi                         | Keterangan                        |
+| ---------------------------- | ------ | ----------------------------------- | --------------------------------- |
+| ESP32 DevKit                 | 1      | 38-pin, ESP32-D0WDQ6                | Sudah ada                         |
+| Relay module                 | 1      | 4-channel, aktif LOW, 5V            | 2 channel dipakai, 2 channel idle |
+| Solenoid door lock           | 2      | 12V, fail-secure                    | 1 per locker                      |
+| Sensor magnet / limit switch | 2      | NC atau NO, 2 kabel                 | 1 per locker                      |
+| Resistor                     | 2      | 10 kΩ, 1/4 W                        | **Wajib** pull-up untuk sensor    |
+| TFT IPS ST7789               | 2      | 1.3", 240×240, SPI                  | 1 per locker                      |
+| Adaptor 12V                  | 1      | ≥ 2 A (2 solenoid × 0.6 A + margin) | Suplai utama                      |
+| Buck converter               | 1      | 12V → 5V, ≥ 2 A                     | Untuk ESP32 + relay               |
+| Diode 1N4007                 | 2-4    | 1 A, 1000 V                         | Flyback protection solenoid       |
+| Terminal block               | 2-3    | 2 atau 4 jalur                      | Pembagi daya                      |
+| Kabel jumper                 | 20+    | Male-male, male-female              |                                   |
 
 ### Opsional / Cadangan
 
@@ -33,36 +39,48 @@ Panduan lengkap _wiring_ & _assembly_ 4-unit Smart Locker untuk tim _hardware_. 
 - Heat shrink tube
 - Kabel AWG 20 untuk jalur solenoid (12V, arus lumayan)
 
+**Catatan:** Kalau nanti mau scale-up ke 4 locker, tambah 2 solenoid,
+2 sensor, 2 resistor, 2 TFT, dan 2 diode. Komponen lain (ESP32, relay,
+adaptor, buck) sudah support 4 locker tanpa ganti.
+
 ---
 
 ## 2. Pin Mapping ESP32
 
 Dari `firmware/smart-locker/src/config.h` — **jangan ubah tanpa kabari Galuh**.
 
+### Pin Aktif (dipakai)
+
 | Fungsi                    | GPIO | Mode       | Keterangan              |
 | ------------------------- | ---- | ---------- | ----------------------- |
-| **Relay IN1** (locker 0)  | 25   | Output     | Aktif LOW               |
-| **Relay IN2** (locker 1)  | 26   | Output     | Aktif LOW               |
-| **Relay IN3** (locker 2)  | 27   | Output     | Aktif LOW               |
-| **Relay IN4** (locker 3)  | 32   | Output     | Aktif LOW               |
-| **Sensor 0**              | 34   | Input-only | Butuh pull-up eksternal |
-| **Sensor 1**              | 35   | Input-only | Butuh pull-up eksternal |
-| **Sensor 2**              | 36   | Input-only | Butuh pull-up eksternal |
-| **Sensor 3**              | 39   | Input-only | Butuh pull-up eksternal |
+| **Relay IN1** (locker_01) | 25   | Output     | Aktif LOW               |
+| **Relay IN2** (locker_02) | 26   | Output     | Aktif LOW               |
+| **Sensor 0** (locker_01)  | 34   | Input-only | Butuh pull-up eksternal |
+| **Sensor 1** (locker_02)  | 35   | Input-only | Butuh pull-up eksternal |
 | **TFT SCLK** (shared)     | 18   | Output SPI | Semua TFT paralel       |
 | **TFT MOSI/SDA** (shared) | 23   | Output SPI | Semua TFT paralel       |
 | **TFT BLK** (shared)      | 19   | Output     | Bisa juga langsung 3.3V |
-| **TFT CS0**               | 4    | Output     | Chip Select locker 0    |
-| **TFT CS1**               | 13   | Output     | Chip Select locker 1    |
-| **TFT CS2**               | 14   | Output     | Chip Select locker 2    |
-| **TFT CS3**               | 33   | Output     | Chip Select locker 3    |
-| **TFT DC0**               | 16   | Output     | Data/Command locker 0   |
-| **TFT DC1**               | 17   | Output     | Data/Command locker 1   |
-| **TFT DC2**               | 21   | Output     | Data/Command locker 2   |
-| **TFT DC3**               | 22   | Output     | Data/Command locker 3   |
+| **TFT CS0** (locker_01)   | 4    | Output     | Chip Select locker_01   |
+| **TFT CS1** (locker_02)   | 13   | Output     | Chip Select locker_02   |
+| **TFT DC0** (locker_01)   | 16   | Output     | Data/Command locker_01  |
+| **TFT DC1** (locker_02)   | 17   | Output     | Data/Command locker_02  |
 | Status LED                | 2    | Output     | Built-in di board       |
 
-⚠️ **GPIO 34, 35, 36, 39 adalah input-only.** Tidak bisa jadi output. Tidak punya pull-up internal. **Wajib pakai resistor 10kΩ ke 3.3V.**
+### Pin Idle (tidak dipakai untuk prototype 2 locker)
+
+| Fungsi    | GPIO | Keterangan                   |
+| --------- | ---- | ---------------------------- |
+| Relay IN3 | 27   | Biarkan kosong               |
+| Relay IN4 | 32   | Biarkan kosong               |
+| Sensor 2  | 36   | Biarkan kosong (floating OK) |
+| Sensor 3  | 39   | Biarkan kosong (floating OK) |
+| TFT CS2   | 14   | Biarkan kosong               |
+| TFT CS3   | 33   | Biarkan kosong               |
+| TFT DC2   | 21   | Biarkan kosong               |
+| TFT DC3   | 22   | Biarkan kosong               |
+
+⚠️ **GPIO 34, 35 adalah input-only.** Tidak bisa jadi output. Tidak punya
+pull-up internal. **Wajib pakai resistor 10kΩ ke 3.3V.**
 
 ---
 
@@ -73,7 +91,7 @@ Dari `firmware/smart-locker/src/config.h` — **jangan ubah tanpa kabari Galuh**
 ```text
 ┌──────────────┐
 │ Adaptor 12V  │
-│    (3A+)     │
+│    (2A+)     │
 └──────┬───────┘
        │
        │ +12V ────┬─────────────────────────────────┐
@@ -85,12 +103,14 @@ Dari `firmware/smart-locker/src/config.h` — **jangan ubah tanpa kabari Galuh**
        │                                            │
        │                                           +5V
        │                                            │
-       │                                 ┌──────────┴──────┐
-       │                                 ▼                 ▼
-       │                             ESP32 VIN         Relay VCC
+       │                                  ┌──────────┴──────┐
+       │                                  ▼                 ▼
+       │                              ESP32 VIN          Relay VCC
        │
        └──── GND ── Common Ground (semua GND gabung)
 ```
+
+````
 
 **Catatan penting:**
 
@@ -101,18 +121,20 @@ Dari `firmware/smart-locker/src/config.h` — **jangan ubah tanpa kabari Galuh**
 ### 3b. Relay → Solenoid (per locker)
 
 ```text
-ESP32         Relay Module                 Solenoid 12V
-─────         ────────────                 ────────────
-GPIO 25 ────► IN1 ────────►│ Relay 1 │
+ESP32            Relay Module                Solenoid 12V
+─────            ────────────                ────────────
+GPIO 25 ────────► IN1 ────►│ Relay 1 │
                            │         │
-+5V ────────► VCC          │         │
-GND ────────► GND          │         │
++5V ────────────► VCC      │         │
+GND ────────────► GND      │         │
                            │         │
               COM ─────────┴─────────► +12V (dari adaptor)
               NO  ───────────────────► Solenoid +
 
 GND ─────────────────────────────────► Solenoid −
 ```
+
+**Untuk locker_02:** sama persis, tapi pakai `IN2` dan `GPIO 26`.
 
 **Flyback diode (wajib):**
 
@@ -125,7 +147,8 @@ GND ─────────────────────────�
 
 - GPIO LOW = relay ON (solenoid energized)
 - GPIO HIGH = relay OFF (solenoid de-energized)
-- Ini default modul relay murah. Kalau punya kamu aktif HIGH, kabari Galuh untuk update firmware.
+- Ini default modul relay murah. Kalau punya kamu aktif HIGH, kabari Galuh
+  untuk update firmware.
 
 ### 3c. Sensor Magnet / Limit Switch (per locker)
 
@@ -134,7 +157,7 @@ GND ─────────────────────────�
  │
 10kΩ  ← resistor pull-up (WAJIB)
  │
- ├────── GPIO 34 (sensor 0)
+ ├────── GPIO 34 (sensor locker_01)
  │
 Sensor Magnet
 (atau limit switch)
@@ -142,40 +165,38 @@ Sensor Magnet
 GND
 ```
 
+**Untuk locker_02:** sama persis, tapi ke `GPIO 35`.
+
 **Cara kerja:**
 
 - Pintu **tertutup** → magnet dekat → sensor konduktif → GPIO = **LOW**
 - Pintu **terbuka** → magnet jauh → sensor tidak konduktif → GPIO = **HIGH** (karena pull-up)
-- Firmware membaca: `door_open = (digitalRead(34) == HIGH)`.
+- Firmware membaca: `door_open = (digitalRead(34) == HIGH)`
 
 **Kalau pakai limit switch**, logikanya sama:
 
 - Ditekan (pintu tertutup) → konduktif → LOW
 - Tidak ditekan (pintu terbuka) → terbuka → HIGH
 
-### 3d. TFT ST7789 4 Display (SPI shared)
+### 3d. TFT ST7789 2 Display (SPI shared)
 
 ```text
-ESP32           TFT Locker 0   TFT Locker 1   TFT Locker 2   TFT Locker 3
-─────           ────────────   ────────────   ────────────   ────────────
-GPIO 18 (SCLK) ───┬──────────► SCL            SCL            SCL            SCL
-GPIO 23 (MOSI) ───┼──────────► SDA            SDA            SDA            SDA
-GPIO 19 (BLK)  ───┼──────────► BLK            BLK            BLK            BLK
-3.3V           ───┼──────────► VCC            VCC            VCC            VCC
-GND            ───┼──────────► GND            GND            GND            GND
-3.3V           ───┼──────────► RES            RES            RES            RES
-GPIO 4         ───┼──────────► CS             -              -              -
-GPIO 13        ───┼─────────── -              CS             -              -
-GPIO 14        ───┼─────────── -              -              CS             -
-GPIO 33        ───┼─────────── -              -              -              CS
-GPIO 16        ───┼──────────► DC             -              -              -
-GPIO 17        ───┼─────────── -              DC             -              -
-GPIO 21        ───┼─────────── -              -              DC             -
-GPIO 22        ───┴─────────── -              -              -              DC
+ESP32            TFT Locker_01   TFT Locker_02
+─────            ─────────────   ─────────────
+GPIO 18 (SCLK) ───┬──────────► SCL               SCL
+GPIO 23 (MOSI) ───┼──────────► SDA               SDA
+GPIO 19 (BLK)  ───┼──────────► BLK               BLK
+3.3V           ───┼──────────► VCC               VCC
+GND            ───┼──────────► GND               GND
+3.3V           ───┼──────────► RES               RES
+GPIO 4         ───┼──────────► CS                -
+GPIO 13        ───┼─────────── -                 CS
+GPIO 16        ───┼──────────► DC                -
+GPIO 17        ───┴─────────── -                 DC
 ```
 
-1. **Konsep:** SCLK, MOSI, BLK, VCC, GND, RES **shared** (paralel ke semua TFT). CS dan DC **individual per TFT** untuk memilih mana yang aktif.
-2. **Total pin TFT:** 6 shared + 8 individual = 14 pin (sudah ada di pin mapping).
+**Konsep:** SCLK, MOSI, BLK, VCC, GND, RES **shared** (paralel ke semua
+TFT). CS dan DC **individual per TFT** untuk memilih mana yang aktif.
 
 ---
 
@@ -183,25 +204,29 @@ GPIO 22        ───┴─────────── -              -   
 
 ### Fase A: Bench Test (1 relay, 1 sensor, 1 TFT)
 
-_Jangan langsung rakit 4 locker. Bench test 1 set dulu._
+Jangan langsung rakit 2 locker. Bench test 1 set dulu.
 
-1. **Wiring power** — adaptor 12V + buck converter. Cek output buck = 5V pakai multimeter sebelum colok ke ESP32.
-2. **Wiring 1 relay** → 1 solenoid + flyback diode. Test: kasih LOW ke IN1, solenoid harus bunyi "tuk" dan terbuka.
-3. **Wiring 1 sensor** + resistor pull-up. Test: tempel magnet, cek tegangan GPIO 34 dengan multimeter (harus ~0V saat magnet dekat, ~3.3V saat jauh).
+1. **Wiring power** — adaptor 12V + buck converter. Cek output buck = 5V
+   pakai multimeter sebelum colok ke ESP32.
+2. **Wiring 1 relay** → 1 solenoid + flyback diode. Test: kasih LOW ke
+   IN1, solenoid harus bunyi "tuk" dan terbuka.
+3. **Wiring 1 sensor** + resistor pull-up. Test: tempel magnet, cek
+   tegangan GPIO 34 dengan multimeter (harus ~0V saat magnet dekat,
+   ~3.3V saat jauh).
 4. **Wiring 1 TFT**. Upload firmware test, harus muncul QR.
 
-_Kalau 4 test di atas lulus, baru lanjut Fase B._
+Kalau 4 test di atas lulus, baru lanjut Fase B.
 
-### Fase B: Multi-Locker Assembly
+### Fase B: 2-Locker Assembly
 
-5. **Wiring 4 relay** (sama seperti test, tinggal tambah 3 lagi).
-6. **Wiring 4 sensor** (masing-masing dengan pull-up 10kΩ).
-7. **Wiring 4 TFT** (SPI paralel + CS/DC individual).
-8. **Mounting fisik** ke lemari.
+5. **Wiring 2 relay** (sama seperti test, tinggal tambah 1 lagi ke GPIO 26).
+6. **Wiring 2 sensor** (masing-masing dengan pull-up 10kΩ ke GPIO 35).
+7. **Wiring 2 TFT** (SPI paralel + CS/DC individual).
+8. **Mounting fisik** ke lemari 2 pintu.
 
 ### Fase C: Integration Test
 
-9. Upload firmware production (`ENABLE_TFT true`, `ENABLE_DOOR_SENSOR true`).
+9. Upload firmware production (`ACTIVE_LOCKERS 2`, `ENABLE_TFT true`, `ENABLE_DOOR_SENSOR true`).
 10. Test per locker: rent → buka → tutup → kode unik → akhiri.
 11. Test race condition (2 locker sekaligus).
 12. Test timeout (pintu dibiarkan terbuka >2 menit).
@@ -232,7 +257,8 @@ _Kalau 4 test di atas lulus, baru lanjut Fase B._
 3. **Pintu terbuka** (magnet jauh): harus ~3.3V.
 4. **Pintu tertutup** (magnet dekat): harus ~0V.
 
-_Kalau selalu 0V atau selalu 3.3V_: cek resistor pull-up, cek kabel, cek orientasi sensor.
+Kalau selalu 0V atau selalu 3.3V: cek resistor pull-up, cek kabel, cek
+orientasi sensor.
 
 ### Test TFT
 
@@ -247,16 +273,23 @@ _Kalau selalu 0V atau selalu 3.3V_: cek resistor pull-up, cek kabel, cek orienta
 
 ### Elektrikal
 
-- **Selalu cek polaritas** sebelum colok power. Adaptor 12V salah arah bisa rusak ESP32 + relay + buck.
-- **Common ground wajib.** Kalau ESP32 GND tidak terhubung ke adaptor GND, relay tidak akan trigger meski GPIO LOW.
-- **Buck converter dulu di-trim** ke 5V sebelum colok ke ESP32. Buck default kadang output 12V, itu bisa rusak ESP32.
-- **Diode flyback wajib** untuk solenoid. Tanpa diode, back-EMF bisa merusak relay atau ESP32.
+- **Selalu cek polaritas** sebelum colok power. Adaptor 12V salah arah
+  bisa rusak ESP32 + relay + buck.
+- **Common ground wajib.** Kalau ESP32 GND tidak terhubung ke adaptor
+  GND, relay tidak akan trigger meski GPIO LOW.
+- **Buck converter dulu di-trim** ke 5V sebelum colok ke ESP32. Buck
+  default kadang output 12V, itu bisa rusak ESP32.
+- **Diode flyback wajib** untuk solenoid. Tanpa diode, back-EMF bisa
+  merusak relay atau ESP32.
 
 ### Mekanik
 
-- Solenoid fail-secure: saat listrik mati, pintu **tetap terkunci**. Bagus untuk keamanan, tapi hati-hati saat test (jangan terkunci di dalam).
+- Solenoid fail-secure: saat listrik mati, pintu **tetap terkunci**.
+  Bagus untuk keamanan, tapi hati-hati saat test (jangan terkunci
+  di dalam).
 - Pastikan kabel tidak terjepit pintu saat locker ditutup.
-- Sensor magnet harus **align** saat pintu tertutup. Kalau tidak, pintu akan terus dianggap terbuka.
+- Sensor magnet harus **align** saat pintu tertutup. Kalau tidak, pintu
+  akan terus dianggap terbuka.
 
 ---
 
@@ -265,7 +298,7 @@ _Kalau selalu 0V atau selalu 3.3V_: cek resistor pull-up, cek kabel, cek orienta
 | Gejala                               | Kemungkinan                               | Solusi                    |
 | ------------------------------------ | ----------------------------------------- | ------------------------- |
 | Relay tidak klik saat GPIO LOW       | Wiring IN salah, VCC relay tidak nyambung | Cek VCC=5V, GND common    |
-| Solenoid bunyi lemah                 | Arus adaptor kurang                       | Ganti adaptor ≥3A         |
+| Solenoid bunyi lemah                 | Arus adaptor kurang                       | Ganti adaptor ≥2A         |
 | Relay klik tapi solenoid tidak gerak | Flyback diode terbalik                    | Cek orientasi diode       |
 | Sensor selalu baca LOW               | Resistor pull-up tidak terpasang          | Pasang 10kΩ ke 3.3V       |
 | Sensor selalu baca HIGH              | Kabel sensor putus                        | Cek kontinuitas           |
@@ -291,19 +324,19 @@ _Kalau selalu 0V atau selalu 3.3V_: cek resistor pull-up, cek kabel, cek orienta
 
 ## 9. Checklist untuk Alfian
 
-- [ ] Beli resistor 10kΩ (4x) — **prioritas #1**
-- [ ] Beli diode 1N4007 (4-8x) — **prioritas #1**
-- [ ] Beli adaptor 12V ≥3A
+- [ ] Beli resistor 10kΩ (2x) — **prioritas #1**
+- [ ] Beli diode 1N4007 (2-4x) — **prioritas #1**
+- [ ] Beli adaptor 12V ≥2A
 - [ ] Beli buck converter 12V→5V ≥2A
 - [ ] Beli terminal block
 - [ ] Beli kabel jumper male-female (untuk breadboard test)
 - [ ] Bench test 1 relay + 1 solenoid
 - [ ] Bench test 1 sensor + pull-up
 - [ ] Bench test 1 TFT
-- [ ] Wiring lengkap 4 relay
-- [ ] Wiring lengkap 4 sensor
-- [ ] Wiring lengkap 4 TFT
-- [ ] Mounting ke lemari
+- [ ] Wiring lengkap 2 relay
+- [ ] Wiring lengkap 2 sensor
+- [ ] Wiring lengkap 2 TFT
+- [ ] Mounting ke lemari 2 pintu
 - [ ] Integration test per locker
 - [ ] Dokumentasi foto progress
 
@@ -316,3 +349,22 @@ Kalau ada pertanyaan wiring atau firmware behavior:
 - **Firmware:** Galuh (pin mapping, logic sensor, TFT)
 - **Backend:** Galuh (device token, endpoint, dsb)
 - **Fisik/casing:** Alfian (lemari, mounting)
+
+````
+
+---
+
+## Rekap Perubahan dari Versi 4 Locker
+
+| Section            | Yang diubah                                                             |
+| ------------------ | ----------------------------------------------------------------------- |
+| Header             | Target 4 → 2 locker + catatan revisi                                    |
+| 1. Komponen        | Jumlah: 4 → 2 (solenoid, sensor, resistor, TFT, diode). Adaptor 3A → 2A |
+| 2. Pin mapping     | Split jadi "Pin Aktif" (2 locker) dan "Pin Idle" (biarkan kosong)       |
+| 3. Wiring diagram  | Semua diagram diupdate untuk 2 TFT + 2 relay + 2 sensor                 |
+| 4. Assembly        | Fase B: 4 → 2 locker                                                    |
+| 5. Test            | Sama, tidak berubah                                                     |
+| 7. Troubleshooting | Adaptor ≥3A → ≥2A                                                       |
+| 9. Checklist       | Semua item 4x → 2x, prioritas adaptor                                   |
+
+---
