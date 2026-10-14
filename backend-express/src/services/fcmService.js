@@ -5,8 +5,28 @@ const {
     db
 } = require("../firebase");
 
+// ============================================================
+// Anti alarm fatigue
+// ============================================================
+// Simpan timestamp notif terakhir per locker (in-memory)
+const lastNotifiedAt = {};
+const NOTIF_COOLDOWN_MS = 10 * 60 * 1000; // 10 menit jeda
+
+// ============================================================
+// Kirim notifikasi ke semua device petugas terdaftar
+// ============================================================
 async function notifyNeedsAttention(lockerId) {
+    // 1. Cek jeda — kalau baru kirim < 10 menit, skip
+    const now = Date.now();
+    const last = lastNotifiedAt[lockerId] || 0;
+    if (now - last < NOTIF_COOLDOWN_MS) {
+        const sisaDetik = Math.floor((NOTIF_COOLDOWN_MS - (now - last)) / 1000);
+        console.log(`[fcm] ${lockerId}: skip (cooldown, ${sisaDetik}s lagi)`);
+        return;
+    }
+
     try {
+        // 2. Ambil semua FCM token petugas
         const snapshot = await db.collection("petugas_devices").get();
         const tokens = [];
         snapshot.forEach((doc) => {
@@ -19,26 +39,80 @@ async function notifyNeedsAttention(lockerId) {
             return;
         }
 
+        // 3. Hitung durasi terbuka untuk body notif
+        const lockerDoc = await db.collection("lockers").doc(lockerId).get();
+        let durasiText = "baru saja";
+        if (lockerDoc.exists) {
+            const data = lockerDoc.data();
+            if (data.needsAttentionSince) {
+                const elapsedMs = Date.now() - data.needsAttentionSince.toMillis();
+                const elapsedMin = Math.floor(elapsedMs / 60000);
+                durasiText = `${elapsedMin} menit lalu`;
+            }
+        }
+
+        // 4. Kirim via FCM
         const messaging = getMessaging();
         const response = await messaging.sendEachForMulticast({
             tokens,
+            // Notification message — tampil otomatis walau app tertutup
             notification: {
-                title: "Locker Perlu Perhatian",
-                body: `Locker ${lockerId} - pintu belum tertutup sejak 2 menit lalu`,
+                title: "⚠️ Locker Perlu Perhatian",
+                body: `Locker ${lockerId.toUpperCase()} — pintu terbuka sejak ${durasiText}. Segera cek.`,
             },
+            // Data message — untuk deep-link ke detail locker
             data: {
-                locker_id: lockerId
+                type: "needs_attention",
+                locker_id: lockerId,
+                click_action: "FLUTTER_NOTIFICATION_CLICK",
+            },
+            // Anti alarm fatigue
+            android: {
+                priority: "high",
+                collapseKey: `locker_${lockerId}`,
+                ttl: 30 * 60 * 1000, // 30 menit
+                notification: {
+                    channelId: "smart_locker_alert",
+                    priority: "high",
+                    defaultSound: true,
+                    defaultVibrateTimings: true,
+                },
+            },
+            apns: {
+                headers: {
+                    "apns-priority": "10",
+                    "apns-collapse-id": `locker_${lockerId}`,
+                },
+                payload: {
+                    aps: {
+                        sound: "default",
+                        badge: 1,
+                    },
+                },
             },
         });
 
         console.log(
             `[fcm] ${lockerId}: sent=${response.successCount}, failed=${response.failureCount}`
         );
+
+        // 5. Update timestamp setelah kirim
+        lastNotifiedAt[lockerId] = now;
     } catch (err) {
         console.error("[fcm] error:", err.message);
     }
 }
 
+// ============================================================
+// Reset cooldown saat locker di-resolve
+// (dipanggil dari endpoint /admin/lockers/:id/resolve)
+// ============================================================
+function resetCooldown(lockerId) {
+    delete lastNotifiedAt[lockerId];
+    console.log(`[fcm] ${lockerId}: cooldown di-reset`);
+}
+
 module.exports = {
-    notifyNeedsAttention
+    notifyNeedsAttention,
+    resetCooldown
 };
