@@ -1,3 +1,5 @@
+import '../utils/duration_formatter.dart';
+
 class RentalRecord {
   final String rentalId;
   final String lockerId;
@@ -30,12 +32,11 @@ class RentalRecord {
   }
 
   /// String terformat untuk ditampilkan di UI.
+  /// Format adaptif — sama seperti `Locker.displayDuration`.
   String get displayDuration {
     final d = duration;
     if (d == null) return '-';
-    if (d.inHours > 0) return '${d.inHours}j ${d.inMinutes % 60}m';
-    if (d.inMinutes > 0) return '${d.inMinutes}m';
-    return '${d.inSeconds}s';
+    return formatDuration(d);
   }
 
   /// Dari response Express `/api/admin/reports/rentals`:
@@ -72,10 +73,7 @@ class RentalStats {
 
   String get displayAvgDuration {
     if (avgDurationSeconds <= 0) return '-';
-    final d = Duration(seconds: avgDurationSeconds);
-    if (d.inHours > 0) return '${d.inHours}j ${d.inMinutes % 60}m';
-    if (d.inMinutes > 0) return '${d.inMinutes} menit';
-    return '${d.inSeconds}s';
+    return formatDuration(Duration(seconds: avgDurationSeconds));
   }
 
   factory RentalStats.fromJson(Map<String, dynamic> json) => RentalStats(

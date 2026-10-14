@@ -1,3 +1,5 @@
+import '../utils/duration_formatter.dart';
+
 enum LockerStatus { empty, occupied, needsAttention }
 
 LockerStatus lockerStatusFromString(String s) {
@@ -35,6 +37,13 @@ class Locker {
 
   /// Durasi terformat. Untuk `occupied`, backend sudah kirim `elapsed_seconds`.
   /// Kalau kosong, hitung live dari `unlockedSince`.
+  ///
+  /// Format adaptif (lihat `utils/duration_formatter.dart`):
+  /// - < 1 menit  → "45s"
+  /// - < 1 jam    → "5m 20s"
+  /// - < 1 hari   → "2j 15m"
+  /// - < 30 hari  → "5h 8j"
+  /// - >= 30 hari → "1bl 12j"
   String get displayDuration {
     Duration d;
     if (elapsedSeconds != null) {
@@ -44,9 +53,7 @@ class Locker {
     } else {
       return '-';
     }
-    if (d.inHours > 0) return '${d.inHours}j ${d.inMinutes % 60}m';
-    if (d.inMinutes > 0) return '${d.inMinutes}m ${d.inSeconds % 60}s';
-    return '${d.inSeconds}s';
+    return formatDuration(d);
   }
 
   /// Label "sejak ..." untuk needs_attention.

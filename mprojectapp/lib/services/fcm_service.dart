@@ -6,20 +6,22 @@ const String _kPrefPetugasId = 'petugas_id';
 
 /// Handler ini WAJIB berupa top-level function (bukan method di class),
 /// dipanggil sistem saat notifikasi masuk ketika app di-background/terminated.
-/// Daftarkan lewat FirebaseMessaging.onBackgroundMessage di main().
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Cukup log di sini; tampilan notifikasi system-tray sudah otomatis
-  // ditangani FCM selama payload berisi block "notification".
-  // print('Background message: ${message.messageId}');
+  // System tray notif otomatis ditangani FCM kalau payload punya block
+  // "notification". Cukup log kalau perlu debug.
 }
 
 class FcmService {
   final ApiService _api;
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
+  /// Static flag: pastikan listener `onTokenRefresh` cuma didaftarkan 1x
+  /// selama lifetime app (biar tidak menumpuk saat initAndRegister dipanggil
+  /// berkali-kali: login + startup + dst).
+  static bool _refreshListenerBound = false;
+
   FcmService(this._api);
 
-  /// Ambil nama/NIP petugas yang tersimpan lokal, kalau ada.
   Future<String?> getSavedPetugasId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_kPrefPetugasId);
@@ -30,34 +32,32 @@ class FcmService {
     await prefs.setString(_kPrefPetugasId, petugasId);
   }
 
-  /// Panggil sekali saat app dibuka pertama kali / login (masih tanpa
-  /// autentikasi penuh sesuai draft dokumen — cukup identitas petugas).
-  /// Minta izin notifikasi, ambil token FCM, lalu daftarkan ke backend.
   Future<void> initAndRegister(String petugasId) async {
     await _savePetugasId(petugasId);
 
-    // iOS & Android 13+ butuh permintaan izin eksplisit.
+    // Minta izin (iOS & Android 13+)
     await _messaging.requestPermission(alert: true, badge: true, sound: true);
 
+    // Ambil token & register
     final token = await _messaging.getToken();
     if (token != null) {
       await _api.registerDevice(fcmToken: token, petugasId: petugasId);
     }
 
-    // Kalau token berubah (reinstall, clear data, dll), daftar ulang otomatis.
-    _messaging.onTokenRefresh.listen((newToken) async {
-      final savedId = await getSavedPetugasId();
-      if (savedId != null) {
-        await _api.registerDevice(fcmToken: newToken, petugasId: savedId);
-      }
-    });
+    // Bind listener onTokenRefresh HANYA SEKALI
+    if (!_refreshListenerBound) {
+      _refreshListenerBound = true;
+      _messaging.onTokenRefresh.listen((newToken) async {
+        final savedId = await getSavedPetugasId();
+        if (savedId != null) {
+          await _api.registerDevice(fcmToken: newToken, petugasId: savedId);
+        }
+      });
+    }
   }
 
-  /// Stream pesan yang diterima saat app sedang dibuka (foreground).
-  /// Backend mengirim data: { locker_id } saat locker jadi needs_attention.
   Stream<RemoteMessage> get onForegroundMessage => FirebaseMessaging.onMessage;
 
-  /// Stream saat user tap notifikasi dan app dibuka dari background.
   Stream<RemoteMessage> get onMessageOpenedApp =>
       FirebaseMessaging.onMessageOpenedApp;
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import '../models/locker.dart';
 import '../models/session.dart';
@@ -22,7 +23,8 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen>
+    with WidgetsBindingObserver {
   late final ApiService _api;
   late final AuthService _authService;
 
@@ -32,10 +34,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Timer? _pollTimer;
   StreamSubscription? _fgMessageSub;
   StreamSubscription? _openedAppSub;
+  DateTime? _lastFetch;
 
   @override
   void initState() {
     super.initState();
+
+    // ⬇️ Register lifecycle observer (untuk auto-refresh saat resume)
+    WidgetsBinding.instance.addObserver(this);
 
     _api = ApiService();
     _api.setToken(widget.session.token);
@@ -43,11 +49,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     _loadLockers();
 
-    // Polling 10 detik karena Express tidak realtime (bukan Firestore stream)
+    // Polling 10 detik
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       _loadLockers(silent: true);
     });
 
+    // FCM foreground
     _fgMessageSub = widget.fcmService.onForegroundMessage.listen((message) {
       final lockerId = message.data['locker_id'];
       if (mounted) {
@@ -62,17 +69,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _loadLockers(silent: true);
     });
 
+    // FCM background → tap notif
     _openedAppSub = widget.fcmService.onMessageOpenedApp.listen((_) {
       _loadLockers(silent: true);
     });
+
+    // ⬇️ FCM terminated → app dibuka dari notif setelah kill
+    _checkInitialMessage();
+  }
+
+  /// Cek apakah app dibuka dari notifikasi (setelah kill total).
+  /// Kalau ya, langsung refresh.
+  Future<void> _checkInitialMessage() async {
+    try {
+      final initial = await FirebaseMessaging.instance.getInitialMessage();
+      if (initial != null) {
+        debugPrint('[Dashboard] App dibuka dari notif: ${initial.data}');
+        _loadLockers(silent: true);
+      }
+    } catch (e) {
+      debugPrint('[Dashboard] getInitialMessage error: $e');
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
     _fgMessageSub?.cancel();
     _openedAppSub?.cancel();
     super.dispose();
+  }
+
+  /// Auto-refresh saat app kembali ke foreground
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final now = DateTime.now();
+      // Throttle 30 detik biar tidak spam
+      if (_lastFetch == null || now.difference(_lastFetch!).inSeconds > 30) {
+        debugPrint('[Dashboard] App resumed → refresh');
+        _loadLockers(silent: true);
+      }
+    }
   }
 
   Future<void> _loadLockers({bool silent = false}) async {
@@ -90,6 +129,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _lockers = lockers;
         _loading = false;
         _error = null;
+        _lastFetch = DateTime.now();
       });
     } catch (e) {
       if (!mounted) return;
