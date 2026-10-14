@@ -408,7 +408,7 @@ Histori masalah & solusinya:
 **Belum:**
 
 - [ ] Test end-to-end hardware fisik (butuh relay + solenoid + sensor + TFT dari Alfian)
-- [ ] Integrasi FCM di app Flutter petugas (Reza)
+- [x] Integrasi FCM di app Flutter petugas (Reza)
 - [ ] Ganti password default admin/petugas1
 - [ ] Merge `feature/firmware` ke `main` lewat Pull Request
 - [x] Hapus endpoint debug (`/api/admin/debug/tokens`) — **selesai** (commit `d1733d1`)

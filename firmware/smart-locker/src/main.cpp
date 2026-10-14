@@ -8,15 +8,9 @@
 #include <Arduino.h>
 #include <esp_task_wdt.h>
 
-<<<<<<< HEAD
-// Ganti dengan SSID WiFi Anda (pastikan tidak ada password atau kosongkan jika terbuka)
-const char *ssid = "Ruang Kuliah 01                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          ";
-const char *password = "";
-=======
 unsigned long lastPollMs = 0;
 String lastRenderedToken[NUM_LOCKERS];
 bool waitingForClose[NUM_LOCKERS] = {false};
->>>>>>> 17bde8fed24258b5ca2c2d59e67a5de797db2789
 
 // Round-robin TFT update: index yang akan di-update pada siklus berikutnya
 int nextTftToRender = 0;
