@@ -1,5 +1,8 @@
 const express = require("express");
 const {
+    resetCooldown
+} = require("../services/fcmService");
+const {
     db
 } = require("../firebase");
 const {
@@ -103,6 +106,8 @@ router.post("/lockers/:id/resolve", requireAuth, async (req, res) => {
         // Update in-memory token store
         tokenStore.setStatus(lockerId, "empty");
         tokenStore.setFrozen(lockerId, false);
+
+        resetCooldown(lockerId);
 
         return res.status(200).json({
             status: "ok",

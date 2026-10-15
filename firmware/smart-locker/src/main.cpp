@@ -12,20 +12,7 @@ unsigned long lastPollMs = 0;
 String lastRenderedToken[NUM_LOCKERS]; // token terbaru dari backend
 String lastDrawnToken[NUM_LOCKERS];    // token yang sudah tergambar di TFT
 bool waitingForClose[NUM_LOCKERS] = {false};
-bool doorSeenOpen[NUM_LOCKERS] = {false};
-unsigned long unlockedAtMs[NUM_LOCKERS] = {0};
-
-// Backend mendeteksi pintu hanya dari nilai door_open tiap /sync. Kalau pintu
-// dibuka lalu ditutup di antara dua sync, backend tidak melihat transisinya.
-// openLatch memastikan "pernah terbuka" tetap terlapor di sync berikutnya.
-bool openLatch[NUM_LOCKERS] = {false};
-bool forceSync = false; // sync segera saat pintu berubah, tanpa tunggu interval
-
-// Batas maksimal solenoid dialiri arus (relay ON) sejak perintah unlock.
-// Solenoid 12V tidak dirancang menyala terus; setelah waktu ini dikunci lagi.
-#ifndef UNLOCK_HOLD_MS
-#define UNLOCK_HOLD_MS 10000
-#endif
+>>>>>>> 17bde8fed24258b5ca2c2d59e67a5de797db2789
 
 // Round-robin TFT update: index yang dicek lebih dulu pada siklus berikutnya
 int nextTftToRender = 0;

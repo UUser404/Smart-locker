@@ -1,17 +1,14 @@
 # Dokumentasi Progress — Smart Locker: Backend & Firmware
 
-> Dokumen ini merangkum apa yang sudah dikerjakan untuk sisi **backend
-> server (Express + Firestore)**, **hosting (Render.com)**, dan
-> **firmware ESP32** dari project Smart Locker IoT, dari awal sampai sesi
-> kerja terakhir. Simpan sebagai catatan lanjutan untuk sesi berikutnya.
+> Dokumen ini merangkum apa yang sudah dikerjakan untuk sisi **backend server (Express + Firestore)**, **hosting (Render.com)**, dan **firmware ESP32** dari project Smart Locker IoT, dari awal sampai sesi kerja terakhir. Simpan sebagai catatan lanjutan untuk sesi berikutnya.
 
 ---
 
 ## 1. Ringkasan Proyek
 
-Smart Locker adalah sistem penyewaan locker otomatis berbasis QR
-dinamis dan web (tanpa akun permanen), dengan sisi internal berupa app
-Flutter untuk Petugas Keamanan & Kebersihan.
+Smart Locker adalah sistem penyewaan locker otomatis berbasis QR dinamis dan web (tanpa akun permanen), dengan sisi internal berupa app Flutter untuk Petugas Keamanan & Kebersihan.
+
+**Skala prototype:** **2 locker** (`locker_01`, `locker_02`) dalam 1 unit lemari 2 pintu, dikendalikan 1 unit ESP32. Firmware tetap mendukung hingga 4 locker di level arsitektur (array pin sudah disiapkan), tapi `ACTIVE_LOCKERS` di-set 2.
 
 Backend server berperan sebagai **single source of truth** untuk:
 
@@ -42,6 +39,7 @@ Dokumen sumber lengkap (sudah ada sebelumnya, tidak diulang di sini):
 - `docs/SKPL_Smart_Locker_IoT_final.docx` — SKPL resmi
 - `DOKUMENTASI_PROGRESS.md` — progress app Flutter petugas (sisi Reza)
 - `firmware/smart_locker_firmware_documentation.md` — detail firmware
+- `firmware/HARDWARE_WIRING_GUIDE.md` — panduan wiring untuk tim hardware
 
 ---
 
@@ -63,12 +61,7 @@ Dokumen sumber lengkap (sudah ada sebelumnya, tidak diulang di sini):
 | **Firmware ↔ backend**    | **`POST /sync`** (gabung poll + report)    | Hemat request, ESP32 lebih ringan                        |
 
 **Kenapa tidak pakai Firebase Cloud Functions?**
-
-Rencana awal backend di-deploy sebagai Firebase Cloud Functions. Tapi
-`firebase deploy --only functions` gagal karena butuh paket Blaze
-(pay-as-you-go) untuk mengaktifkan API Cloud Build. Solusi: pindah ke
-Express server biasa yang di-hosting di Render, tetap akses Firestore
-yang sama lewat service account key.
+Rencana awal backend di-deploy sebagai Firebase Cloud Functions. Tapi `firebase deploy --only functions` gagal karena butuh paket Blaze (pay-as-you-go) untuk mengaktifkan API Cloud Build. Solusi: pindah ke Express server biasa yang di-hosting di Render, tetap akses Firestore yang sama lewat service account key.
 
 ---
 
@@ -127,20 +120,17 @@ Response field: `stats` (total_rentals, avg_duration_seconds, busiest_locker_id)
 ### Fase 1 — In-Memory Token Rotation (Fix Quota)
 
 **Masalah:** Rotator token tulis Firestore 4 locker × 12×/menit = ~69.000 writes/hari. Limit free tier cuma 20.000/hari → quota exceeded.
-
 **Solusi:** Token disimpan **di RAM backend**. Firestore cuma menyimpan data penting (status locker, rental, dll).
-
 **Hasil:** Writes harian untuk rotasi turun ke **~0**. Kalau backend restart, token langsung regenerate otomatis.
 
 ### Fase 4 — Device Authentication
 
 **Endpoint firmware sekarang wajib header `X-Device-Token`.**
-
-| Endpoint                             | Method | Auth         | Status |
-| ------------------------------------ | ------ | ------------ | ------ |
-| `/api/firmware/:controllerId/poll`   | GET    | Device Token | ✅     |
-| `/api/firmware/:controllerId/report` | POST   | Device Token | ✅     |
-| `/api/firmware/:controllerId/sync`   | POST   | Device Token | ✅     |
+| Endpoint | Method | Auth | Status |
+| --- | --- | --- | --- |
+| `/api/firmware/:controllerId/poll` | GET | Device Token | ✅ |
+| `/api/firmware/:controllerId/report` | POST | Device Token | ✅ |
+| `/api/firmware/:controllerId/sync` | POST | Device Token | ✅ |
 
 **Cara kerja:**
 
@@ -151,6 +141,24 @@ Response field: `stats` (total_rentals, avg_duration_seconds, busiest_locker_id)
 ### Fase 5 — Endpoint `/sync` (Gabungan Poll + Report)
 
 **Endpoint baru:** `POST /api/firmware/:controllerId/sync`
+
+### Fase 6 — Anti Alarm Fatigue (FCM Polish)
+
+Mengacu pada materi PBP 6 tentang mencegah alarm fatigue:
+
+- **Jeda (cooldown)**: max 1 notif per locker per 10 menit
+- **Collapse key**: `locker_{lockerId}` — notif baru override notif lama
+- **Time to Live (TTL)**: 30 menit — notif basi tidak dikirim
+- **Prioritas tinggi**: mode hemat daya Android tetap kirim
+- **Isi dinamis**: durasi terbuka dihitung real-time ("pintu terbuka sejak 5 menit lalu")
+- **Channel Android**: `smart_locker_alert` (sound + vibrate)
+- **Cooldown reset**: saat petugas resolve locker, cooldown di-reset supaya masalah baru langsung dinotifikasi
+
+**Test:**
+
+- `sent=3, failed=0` — kirim ke 3 device petugas berhasil
+- `skip (cooldown, 598s lagi)` — panggilan kedua di-skip dalam 10 menit
+- `cooldown di-reset` → `sent=3, failed=0` — reset bekerja
 
 **Request body:**
 
@@ -180,10 +188,10 @@ Response field: `stats` (total_rentals, avg_duration_seconds, busiest_locker_id)
 
 ## 4. Struktur Kode
 
-```
+```text
 backend-express/
 ├── server.js                        # entry point (Express + startScheduler + initTokenStore)
-├── seed.js                          # seed 4 locker untuk testing
+├── seed.js                          # seed locker untuk testing
 ├── seedPetugas.js                   # seed akun admin & petugas1
 ├── seedController.js                # seed device auth token (tidak di-commit)
 ├── reset.js                         # reset state locker + rate_limits (dev only)
@@ -198,7 +206,7 @@ backend-express/
     │   └── deviceAuthMiddleware.js # requireDeviceAuth (device token firmware)
     ├── routes/
     │   ├── auth.js                  # POST /login
-    │   ├── admin.js                 # endpoint admin + reports + debug
+    │   ├── admin.js                 # endpoint admin + reports
     │   ├── lockers.js               # endpoint pelanggan (status, rent, access)
     │   ├── rentals.js               # endpoint sesi (rental status)
     │   └── firmware.js              # endpoint firmware (poll, report, sync)
@@ -217,19 +225,12 @@ backend-express/
         └── fcmService.js            # kirim push notification
 ```
 
-### Detail file penting (baru)
+### Detail File Penting (Baru)
 
-**`src/services/tokenStoreService.js`**
-In-memory store untuk token QR per locker. Fungsi: `initLocker`, `setStatus`, `setFrozen`, `rotate`, `rotateAll`, `getLatestToken`, `isTokenValid`, `getAll`. Token valid 60 detik, histori max 15 token.
-
-**`src/services/tokenStoreInit.js`**
-Load semua locker dari Firestore saat server start. Kalau Firestore gagal (quota exceeded), fallback ke daftar statis (untuk dev). Retry tiap 60 detik.
-
-**`src/services/lockerStateStore.js`**
-In-memory state pintu + solenoid per locker. Dipakai untuk deteksi transisi di endpoint `/sync`.
-
-**`src/middleware/deviceAuthMiddleware.js`**
-Cek header `X-Device-Token` di endpoint `/firmware/*`. Cache token di memory 5 menit.
+- `src/services/tokenStoreService.js`: In-memory store untuk token QR per locker. Fungsi: `initLocker`, `setStatus`, `setFrozen`, `rotate`, `rotateAll`, `getLatestToken`, `isTokenValid`, `getAll`. Token valid 60 detik, histori max 15 token.
+- `src/services/tokenStoreInit.js`: Load semua locker dari Firestore saat server start. Kalau Firestore gagal (quota exceeded), fallback ke daftar statis (untuk dev). Retry tiap 60 detik.
+- `src/services/lockerStateStore.js`: In-memory state pintu + solenoid per locker. Dipakai untuk deteksi transisi di endpoint `/sync`.
+- `src/middleware/deviceAuthMiddleware.js`: Cek header `X-Device-Token` di endpoint `/firmware/*`. Cache token di memory 5 menit.
 
 ---
 
@@ -244,21 +245,16 @@ Cek header `X-Device-Token` di endpoint `/firmware/*`. Cache token di memory 5 m
 ### Langkah
 
 1. Masuk folder `backend-express`:
-
    ```powershell
    cd backend-express
    ```
-
 2. Install dependency:
-
    ```powershell
    npm install
    ```
-
-3. Ambil **service account key** dari Firebase Console:
+3. Ambil service account key dari Firebase Console:
    - Firebase Console → ⚙️ Project Settings → Service accounts → Generate new private key
    - Simpan sebagai `backend-express/serviceAccountKey.json`
-
 4. Seed data:
 
    ```powershell
@@ -267,7 +263,7 @@ Cek header `X-Device-Token` di endpoint `/firmware/*`. Cache token di memory 5 m
    node seedController.js
    ```
 
-   - `seed.js`: 4 locker dengan token valid 1 jam
+   - `seed.js`: 2 locker dengan token valid 1 jam
    - `seedPetugas.js`: akun `admin/admin123` dan `petugas1/petugas123`
    - `seedController.js`: device auth token untuk `esp32_01`
 
@@ -275,7 +271,7 @@ Cek header `X-Device-Token` di endpoint `/firmware/*`. Cache token di memory 5 m
    ```powershell
    node server.js
    ```
-   Harus muncul: `Server jalan di port 3000`, `[tokenStore] Initialized 4 lockers`, `[scheduler] started`
+   Harus muncul: `Server jalan di port 3000`, `[tokenStore] Initialized 2 lockers`, `[scheduler] started`.
 
 ### Akun Testing
 
@@ -290,7 +286,7 @@ Cek header `X-Device-Token` di endpoint `/firmware/*`. Cache token di memory 5 m
 
 Dari output `seedController.js`:
 
-```
+```text
 [seed] authToken: 70cd4fbd2fd930b1844d7dcff3bb9270
 ```
 
@@ -300,7 +296,7 @@ Simpan token ini di firmware `config.h` sebagai `DEVICE_TOKEN`. Untuk test manua
 
 ## 6. Deploy ke Render (Production)
 
-**Base URL production:** `https://smart-locker-backend-a2ck.onrender.com`
+- **Base URL production:** `https://smart-locker-backend-a2ck.onrender.com`
 
 ### Konfigurasi Web Service di Render
 
@@ -332,8 +328,7 @@ Auto-deploy belum aktif. Setiap update kode:
 - Menambah file baru
 - Ubah `package.json`
 - Tambah route baru
-
-**Kalau lupa clear cache saat ada file baru**, route baru tidak muncul (balas 404 HTML dari Express, bukan JSON).
+  _(Kalau lupa clear cache saat ada file baru, route baru tidak muncul: balas 404 HTML dari Express, bukan JSON)._
 
 ---
 
@@ -341,137 +336,163 @@ Auto-deploy belum aktif. Setiap update kode:
 
 Histori masalah & solusinya:
 
-1. **`firebase deploy --only functions` gagal "must be on Blaze plan"`** — Cloud Functions butuh API Cloud Build yang cuma bisa diaktifkan di paket Blaze. Solusi: pindah ke Express server biasa + Render.
-
-2. **`TypeError: Cannot read properties of undefined (reading 'cert')`** — `firebase-admin` v14 pakai API modular. Solusi: `const { initializeApp, cert } = require("firebase-admin/app")`.
-
-3. **`Cannot find module '@google-cloud/firestore'` di Render** — sub-dependency tidak ke-install otomatis. Solusi: `npm install @google-cloud/firestore`.
-
-4. **Render build cache stale** — commit baru tidak ke-deploy meski push sukses. Solusi: **Clear build cache & deploy**.
-
-5. **Server lokal masih pakai route lama** — Node.js tidak auto-reload. Setelah edit, stop server (Ctrl+C) dan start ulang.
-
-6. **`RPC failed; curl 35 Recv failure`** saat git push — masalah HTTP/2. Solusi: `git config --global http.version HTTP/1.1`.
-
-7. **Token QR expire saat test production** — token cuma valid 60 detik. Untuk testing, `seed.js` kasih token berlaku 1 jam.
-
-8. **`ReferenceError: checkLock is not defined`** — require rate limiter belum ada atau salah posisi.
-
-9. **`LOCKER_NOT_OCCUPIED` saat test rate limiter** — timeout monitor ubah locker ke `needs_attention`. Solusi: ubah `TIMEOUT_MS` sementara untuk testing.
-
-10. **`LOGIN 401` setelah ganti `JWT_SECRET` di Render** — token lama jadi invalid. Solusi: login ulang.
-
-11. **404 HTML dari Express di production** — route tidak ter-register. Cek commit yang ter-deploy = commit terakhir, kalau ya → clear build cache.
-
-12. **Typo command PowerShell** (misal `node server.jsnode server.js`) — cek perintah sebelum Enter.
-
-13. **`8 RESOURCE_EXHAUSTED: Quota exceeded`** — Firestore free tier harian habis. Penyebab: rotator token tulis Firestore terlalu sering. Solusi: **Fase 1 (in-memory token rotation)** — token disimpan di RAM, tidak tulis Firestore lagi.
-
-14. **`SyntaxError: Unexpected token '?'` di tokenStoreService.js** — kode `??` ketulis jadi `? ?` (ada spasi). Solusi: ganti `??` dengan if-else eksplisit.
-
-15. **Watchdog trigger saat TFT belum terpasang** — firmware coba render QR ke TFT yang tidak ada, SPI blocking. Solusi: `ENABLE_TFT false` di `config.h` untuk dev mode.
-
-16. **GPIO 34-39 flapping (pintu terbuka-tutup tanpa henti)** — pin input-only tidak punya internal pull-up. Solusi dev: `ENABLE_DOOR_SENSOR false`. Solusi hardware: resistor pull-up 10kΩ ke 3.3V.
-
-17. **`[Sync] HTTP 404 Cannot POST /api/firmware/esp32_01/sync`** — endpoint `/sync` belum ke-commit/deploy. Solusi: commit backend, push, deploy Render.
-
+1. `firebase deploy --only functions` gagal `"must be on Blaze plan"` — Cloud Functions butuh API Cloud Build yang cuma bisa diaktifkan di paket Blaze. Solusi: pindah ke Express server biasa + Render.
+2. `TypeError: Cannot read properties of undefined (reading 'cert')` — firebase-admin v14 pakai API modular. Solusi: `const { initializeApp, cert } = require("firebase-admin/app")`.
+3. `Cannot find module '@google-cloud/firestore'` di Render — sub-dependency tidak ke-install otomatis. Solusi: `npm install @google-cloud/firestore`.
+4. Render build cache stale — commit baru tidak ke-deploy meski push sukses. Solusi: Clear build cache & deploy.
+5. Server lokal masih pakai route lama — Node.js tidak auto-reload. Setelah edit, stop server (`Ctrl+C`) dan start ulang.
+6. `RPC failed; curl 35 Recv failure` saat `git push` — masalah HTTP/2. Solusi: `git config --global http.version HTTP/1.1`.
+7. Token QR expire saat test production — token cuma valid 60 detik. Untuk testing, `seed.js` kasih token berlaku 1 jam.
+8. `ReferenceError: checkLock is not defined` — require rate limiter belum ada atau salah posisi.
+9. `LOCKER_NOT_OCCUPIED` saat test rate limiter — timeout monitor ubah locker ke `needs_attention`. Solusi: ubah `TIMEOUT_MS` sementara untuk testing.
+10. `LOGIN 401` setelah ganti `JWT_SECRET` di Render — token lama jadi invalid. Solusi: login ulang.
+11. 404 HTML dari Express di production — route tidak ter-register. Cek commit yang ter-deploy = commit terakhir, kalau ya → clear build cache.
+12. Typo command PowerShell (misal `node server.jsnode server.js`) — cek perintah sebelum Enter.
+13. `RESOURCE_EXHAUSTED: Quota exceeded` — Firestore free tier harian habis. Penyebab: rotator token tulis Firestore terlalu sering. Solusi: Fase 1 (in-memory token rotation) — token disimpan di RAM, tidak tulis Firestore lagi.
+14. `SyntaxError: Unexpected token '?'` di `tokenStoreService.js` — kode `??` ketulis jadi `? ?` (ada spasi). Solusi: ganti `??` dengan if-else eksplisit.
+15. Watchdog trigger saat TFT belum terpasang — firmware coba render QR ke TFT yang tidak ada, SPI blocking. Solusi: `ENABLE_TFT false` di `config.h` untuk dev mode.
+16. GPIO 34-39 flapping (pintu terbuka-tutup tanpa henti) — pin input-only tidak punya internal pull-up. Solusi dev: `ENABLE_DOOR_SENSOR false`. Solusi hardware: resistor pull-up 10kΩ ke 3.3V.
+17. `[Sync] HTTP 404 Cannot POST /api/firmware/esp32_01/sync` — endpoint `/sync` belum ke-commit/deploy. Solusi: commit backend, push, deploy Render.
 18. **`401 INVALID_DEVICE_TOKEN` dengan token yang "sama"`** — 1 karakter hilang saat copy-paste token. Solusi: copy token dari Firestore Console (`controllers/esp32_01.authToken`), bandingkan karakter-per-karakter.
+19. FCM notification test offline — kalau HP penerima tidak terhubung internet, notifikasi tertahan di FCM dan baru muncul saat HP kembali online. Ini behavior by design (FCM TTL default 4 minggu). Sudah tested dan bekerja sesuai harapan.
 
 ---
 
 ## 8. Status Saat Ini
 
-**Backend:**
+### Backend:
 
-- [x] Setup hosting backend (Render.com) + Firestore
-- [x] Batch 1: 4 endpoint pelanggan
-- [x] Batch 2: 2 endpoint firmware + service latar
-- [x] Batch 3: 4 endpoint admin (login JWT, list, resolve, register-device)
-- [x] Batch 4: rate limiter + FCM
-- [x] Batch 5: reports endpoint
-- [x] Fase 1: in-memory token rotation (fix quota)
-- [x] Fase 4: device auth token
-- [x] Fase 5: endpoint `/sync`
-- [x] Semua endpoint di-test di lokal & production
-- [x] Service account key aman (tidak ke-commit)
-- [x] JWT_SECRET ter-set di Render
+- ☑ Setup hosting backend (Render.com) + Firestore
+- ☑ Batch 1: 4 endpoint pelanggan
+- ☑ Batch 2: 2 endpoint firmware + service latar
+- ☑ Batch 3: 4 endpoint admin (login JWT, list, resolve, register-device)
+- ☑ Batch 4: rate limiter + FCM
+- ☑ Batch 5: reports endpoint
+- ☑ Fase 1: in-memory token rotation (fix quota)
+- ☑ Fase 4: device auth token
+- ☑ Fase 5: endpoint `/sync`
+- ☑ Semua endpoint di-test di lokal & production
+- ☑ Service account key aman (tidak ke-commit)
+- ☑ `JWT_SECRET` ter-set di Render
 
-**Firmware:**
+### Firmware:
 
-- [x] `wifi_client` — connect + reconnect (tested)
-- [x] `backend_poller` (sync mode) — tested end-to-end
-- [x] `lock_control` — compile OK, belum test relay fisik
-- [x] `door_sensor` — compile OK, tested via jumper
-- [x] `event_reporter` — terintegrasi ke `/sync`
-- [x] `tft_render` — compile OK, dry-run
+- ☑ `wifi_client` — connect + reconnect (tested)
+- ☑ `backend_poller` (sync mode) — tested end-to-end
+- ☑ `lock_control` — compile OK, belum test relay fisik
+- ☑ `door_sensor` — compile OK, tested via jumper
+- ☑ `event_reporter` — terintegrasi ke `/sync`
+- ☑ `tft_render` — compile OK, dry-run
+- ☑ `config.h` di-set untuk 2 locker (`ACTIVE_LOCKERS 2` di production mode)
 
-**Belum:**
+### App Petugas (Reza):
 
-- [ ] Test end-to-end hardware fisik (butuh relay + solenoid + sensor + TFT dari Alfian)
-- [ ] Integrasi FCM di app Flutter petugas (Reza)
-- [ ] Ganti password default admin/petugas1
-- [ ] Merge `feature/firmware` ke `main` lewat Pull Request
-- [x] Hapus endpoint debug (`/api/admin/debug/tokens`) — **selesai** (commit `d1733d1`)
+- ☑ Integrasi FCM di app Flutter petugas (Reza) — selesai & tested
+- ☑ Login sebagai `petugas3` di app Flutter
+- ☑ Notifikasi diterima saat app terbuka
+- ☑ Notifikasi diterima saat app tertutup (via baki notifikasi)
+- ☑ Notifikasi tertahan saat offline, muncul saat online
+
+### Belum:
+
+- □ Test end-to-end hardware fisik (butuh relay + solenoid + sensor + TFT dari Alfian)
+- □ Ganti password default `admin`/`petugas1`
+- □ Merge `feature/firmware` ke `main` lewat Pull Request
+
+---
 
 ## 9. Keputusan Desain
 
-| Pertanyaan                                              | Keputusan                                           |
-| ------------------------------------------------------- | --------------------------------------------------- |
-| Akun admin/petugas: seed manual atau endpoint register? | **Seed manual** di Firestore (collection `petugas`) |
-| Token login                                             | **JWT expire 7 hari**, tanpa refresh                |
-| Filter tanggal di reports                               | **Tidak dulu**. Tampilkan semua.                    |
-| `no_hp` di reports                                      | **Dimask sebagian** (`0812****89`)                  |
-| Firmware endpoint                                       | **Device token** (header `X-Device-Token`)          |
-| Firmware komunikasi                                     | **`POST /sync`** — gabungan poll + report           |
-| Token QR storage                                        | **In-memory** (RAM), bukan Firestore                |
-| QR validity                                             | 60 detik, rotasi 5 detik, histori 15 token          |
+| Pertanyaan                                              | Keputusan                                       |
+| ------------------------------------------------------- | ----------------------------------------------- |
+| Akun admin/petugas: seed manual atau endpoint register? | Seed manual di Firestore (collection `petugas`) |
+| Token login                                             | JWT expire 7 hari, tanpa refresh                |
+| Filter tanggal di reports                               | Tidak dulu. Tampilkan semua.                    |
+| `no_hp` di reports                                      | Dimask sebagian (`0812****89`)                  |
+| Firmware endpoint                                       | Device token (header `X-Device-Token`)          |
+| Firmware komunikasi                                     | `POST /sync` — gabungan poll + report           |
+| Token QR storage                                        | In-memory (RAM), bukan Firestore                |
+| QR validity                                             | 60 detik, rotasi 5 detik, histori 15 token      |
+| Skala prototype                                         | 2 locker (dari rencana awal 4)                  |
 
 ---
 
 ## 10. Langkah Selanjutnya
 
-### Hardware Integration (menunggu Alfian rakit)
+### 1. Hardware Integration (menunggu Alfian rakit — target 2 locker)
 
-- Wiring relay 4-channel ke GPIO 25, 26, 27, 32
-- Wiring sensor magnet/limit switch ke GPIO 34, 35, 36, 39 + **resistor pull-up 10kΩ**
-- Wiring TFT ST7789 1.3" — SCLK=18, MOSI=23, CS=[4,13,14,33], DC=[16,17,21,22], BLK=19
-- Solenoid 12V fail-secure + adaptor + diode flyback
+- Wiring relay 4-channel ke GPIO 25, 26 (2 channel aktif, 2 idle)
+- Wiring sensor magnet/limit switch ke GPIO 34, 35 (2 sensor) + resistor pull-up 10kΩ
+- Wiring TFT ST7789 1.3" — `SCLK=18`, `MOSI=23`, `BLK=19`
+  - `Locker_01`: `CS=4`, `DC=16`
+  - `Locker_02`: `CS=13`, `DC=17`
+  - (`CS=14/DC=21` dan `CS=33/DC=22` idle untuk `locker_03/04`)
+- Solenoid 12V fail-secure × 2 + adaptor 12V ≥2A + diode flyback
+- Detail wiring lengkap: lihat `firmware/HARDWARE_WIRING_GUIDE.md`
 
-### Integrasi FCM di App Flutter (Reza)
+### 2. Integrasi FCM di App Flutter (Reza) — **DONE**
 
-1. App ambil FCM token dari Firebase Messaging
-2. App panggil `POST /api/admin/register-device`
-3. Backend simpan di `petugas_devices`
-4. Backend auto-kirim push saat locker jadi `needs_attention`
+- ☑ App ambil FCM token dari Firebase Messaging
+- ☑ App panggil `POST /api/admin/register-device`
+- ☑ Backend simpan di `petugas_devices`
+- ☑ Backend auto-kirim push saat locker jadi `needs_attention`
+- ☑ Tested: notif sampai saat app terbuka & tertutup
 
-### Production Hardening
+### 3. Production Hardening
 
-- Ganti password default `admin/admin123` dan `petugas1/petugas123`
-- Hapus endpoint `/api/admin/debug/tokens`
-- Set `ENABLE_TFT true` dan `ENABLE_DOOR_SENSOR true` di firmware production
-- Set `BUILD_MODE_PRODUCTION` di firmware
-- Audit `JWT_SECRET` (harus random)
+- □ Ganti password default `admin/admin123` dan `petugas1/petugas123`
+- □ Set `ENABLE_TFT true` dan `ENABLE_DOOR_SENSOR true` di firmware production
+- □ Set `BUILD_MODE_PRODUCTION` di firmware
+- □ Audit `JWT_SECRET` (harus random)
+
+### 4. Optional Improvement (untuk demo lanjutan)
+
+Anti alarm fatigue di `fcmService.js`:
+
+- Jeda notif (max 1× per locker per 10 menit)
+- Collapse key per `locker_id`
+- TTL 30 menit
+- Prioritas high untuk `needs_attention`
 
 ---
 
 ## 11. Catatan untuk Sesi Berikutnya
 
-- **`reset.js` dan `seedController.js` di-gitignore** — kalau clone repo di komputer baru, bikin sendiri atau pakai seed script
-- **`serviceAccountKey.json` tidak ada di GitHub** — generate ulang dari Firebase Console
-- **Auto-deploy Render belum aktif** — pakai manual deploy
-- **Token QR di production seed berlaku 1 jam** — untuk testing, bukan spec final (spec: 60 detik)
-- **`docs/API.md` adalah kontrak resmi** — setiap perubahan endpoint, update dokumen dulu
-- **Firmware dan backend harus sinkron** — kalau ganti endpoint firmware, update `config.h` juga
+- `reset.js` dan `seedController.js` di-gitignore — kalau clone repo di komputer baru, bikin sendiri atau pakai seed script.
+- `serviceAccountKey.json` tidak ada di GitHub — generate ulang dari Firebase Console.
+- Auto-deploy Render belum aktif — pakai manual deploy.
+- Token QR di production seed berlaku 1 jam — untuk testing, bukan spec final (spec: 60 detik).
+- `docs/API.md` adalah kontrak resmi — setiap perubahan endpoint, update dokumen dulu.
+- Firmware dan backend harus sinkron — kalau ganti endpoint firmware, update `config.h` juga.
+- Skala prototype = 2 locker — semua dokumentasi dan kode harus konsisten dengan angka ini.
 
 ---
 
 ## 12. Referensi Penting
 
-- **Repo:** https://github.com/UUser404/Smart-locker
+- **Repo:** [https://github.com/UUser404/Smart-locker](https://github.com/UUser404/Smart-locker)
 - **Branch:** `feature/firmware`
-- **Production URL:** https://smart-locker-backend-a2ck.onrender.com
-- **Dashboard Render:** https://dashboard.render.com
-- **Firebase Console:** https://console.firebase.google.com/project/smart-locker-project-45bac
+- **Production URL:** [https://smart-locker-backend-a2ck.onrender.com](https://smart-locker-backend-a2ck.onrender.com)
+- **Dashboard Render:** [https://dashboard.render.com](https://dashboard.render.com)
+- **Firebase Console:** [https://console.firebase.google.com/project/smart-locker-project-45bac](https://console.firebase.google.com/project/smart-locker-project-45bac)
 - **Kontrak API:** `docs/API.md`
 - **SKPL:** `docs/SKPL_Smart_Locker_IoT_final.docx`
 - **Firmware docs:** `firmware/smart_locker_firmware_documentation.md`
+- **Wiring guide:** `firmware/HARDWARE_WIRING_GUIDE.md`
+
+---
+
+## Rekap Perubahan dari Versi Sebelumnya
+
+| Section            | Yang diubah                                                                                   |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| 1. Ringkasan       | Tambah skala 2 locker + referensi wiring guide                                                |
+| 3. Fase 1          | 4 locker → referensi generik (karena rotator untuk semua locker)                              |
+| 5. Setup           | `seed.js`: 4 → 2 locker. `Initialized 4 lockers` → `2 lockers`                                |
+| 7. Troubleshooting | Tambah item #19: FCM offline retensi (behavior by design)                                     |
+| 8. Status          | **FCM ditandai [x] selesai** (kamu sudah konfirmasi). Tambah poin firmware `ACTIVE_LOCKERS 2` |
+| 9. Keputusan       | Tambah baris "Skala prototype: 2 locker"                                                      |
+| 10. Hardware       | Wiring 2 locker detail (CS/DC spesifik per locker) + referensi wiring guide                   |
+| 10. FCM            | Section diubah jadi "DONE" dengan checklist centang                                           |
+| 10. Optional       | Tambah improvement anti-alarm-fatigue sebagai opsional                                        |
+| 11. Catatan        | Tambah poin "Skala prototype = 2 locker"                                                      |
