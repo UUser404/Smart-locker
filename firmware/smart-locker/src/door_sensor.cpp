@@ -1,43 +1,61 @@
 #include "door_sensor.h"
 
-// State terakhir per locker (untuk deteksi transisi)
-static bool lastState[NUM_LOCKERS] = {false};
-static unsigned long lastChangeMs[NUM_LOCKERS] = {0};
+// State stabil (sudah lolos debounce) + kandidat state yang sedang diamati
+static bool stableState[NUM_LOCKERS] = {false};
+static bool candidateState[NUM_LOCKERS] = {false};
+static unsigned long candidateSinceMs[NUM_LOCKERS] = {0};
 
-void door_init() {
-  for (int i = 0; i < NUM_LOCKERS; i++) {
-    pinMode(SENSOR_PINS[i], INPUT_PULLUP);
-    lastState[i] = false;
-    lastChangeMs[i] = 0;
+static bool read_open_raw(int idx)
+{
+  // Wiring: pull-up eksternal 10k ke 3.3V, limit switch (terminal C + NO) ke GND.
+  // Pintu tertutup = switch tertekan = LOW. Pintu terbuka = HIGH.
+  return digitalRead(SENSOR_PINS[idx]) == HIGH;
+}
+
+void door_init()
+{
+  for (int i = 0; i < ACTIVE_LOCKERS; i++)
+  {
+    // GPIO 34/35/36/39 input-only dan TIDAK punya pull-up internal,
+    // jadi pakai INPUT biasa; pull-up harus resistor eksternal.
+    pinMode(SENSOR_PINS[i], INPUT);
+    bool open = read_open_raw(i);
+    stableState[i] = open; // mulai dari kondisi nyata, bukan asumsi "tertutup"
+    candidateState[i] = open;
+    candidateSinceMs[i] = millis();
   }
   Serial.println("[Door] Init selesai.");
 }
 
-bool door_is_open(int idx) {
-  if (idx < 0 || idx >= NUM_LOCKERS)
-    return false;
-  // Sensor magnet/limit switch: LOW saat pintu tertutup (dengan pullup)
-  // Jadi terbuka = HIGH
-  int raw = digitalRead(SENSOR_PINS[idx]);
-  return (raw == HIGH);
+bool door_is_open(int idx)
+{
+  if (idx < 0 || idx >= ACTIVE_LOCKERS)
+    return false; // locker tidak aktif dianggap tertutup
+  return read_open_raw(idx);
 }
 
-int door_check_transition(int idx) {
-  if (idx < 0 || idx >= NUM_LOCKERS)
+int door_check_transition(int idx)
+{
+  if (idx < 0 || idx >= ACTIVE_LOCKERS)
     return 0;
 
-  bool current = door_is_open(idx);
+  bool current = read_open_raw(idx);
   unsigned long now = millis();
 
-  // Debounce
-  if (current != lastState[idx]) {
-    if (now - lastChangeMs[idx] < SENSOR_DEBOUNCE_MS) {
-      return 0; // belum stabil
-    }
-    lastChangeMs[idx] = now;
-    int result = current ? 1 : -1;
-    lastState[idx] = current;
-    return result;
+  // Pembacaan berubah: mulai hitung ulang masa stabil
+  if (current != candidateState[idx])
+  {
+    candidateState[idx] = current;
+    candidateSinceMs[idx] = now;
+    return 0;
+  }
+
+  // Sudah stabil >= SENSOR_DEBOUNCE_MS dan beda dari state terakhir -> transisi
+  if (current != stableState[idx] &&
+      (now - candidateSinceMs[idx]) >= SENSOR_DEBOUNCE_MS)
+  {
+    stableState[idx] = current;
+    return current ? 1 : -1; // 1 = baru terbuka, -1 = baru tertutup
   }
   return 0;
 }

@@ -1,138 +1,280 @@
-# Dokumentasi Progress — Smart Locker: App Petugas (Flutter)
+# Dokumentasi Progress — Smart Locker: App Petugas & Admin (Flutter)
 
-> Dokumen ini merangkum apa yang sudah dikerjakan untuk sisi **app Flutter
-> petugas** dan **web pelanggan** dari project Smart Locker IoT, dari awal
-> sampai sesi kerja terakhir. Simpan sebagai catatan lanjutan untuk sesi
-> berikutnya.
+> Dokumen ini merangkum apa yang sudah dikerjakan untuk sisi **app Flutter petugas & admin** dan **web pelanggan** dari project Smart Locker IoT, dari awal sampai sesi kerja terakhir (14 Oktober 2026).
 
 ---
 
 ## 1. Ringkasan Proyek
 
-Smart Locker: sistem penyewaan locker otomatis berbasis scan barcode,
-tanpa akun permanen. Ada 2 sisi:
+**Smart Locker**: sistem penyewaan locker otomatis berbasis scan QR dinamis, tanpa akun permanen.
 
-- **Sisi pelanggan** — sepenuhnya web (dikerjakan user, belum dimulai per dokumen ini)
-- **Sisi Petugas Keamanan & Kebersihan** — app Flutter Android (dikerjakan user, progress dijelaskan di bawah)
+Ada 2 sisi:
 
-Alur inti: user scan barcode → isi nama & no HP → dapat kode unik 1x-lihat →
-locker terbuka → sensor magnet auto-lock saat pintu ditutup → sesi model
-"parkir" (durasi dihitung, bukan ditentukan di awal). Kalau pintu tidak
-tertutup dalam 2 menit, backend menandai locker `needs_attention` dan
-mengirim push notification ke app petugas.
+- **Sisi pelanggan** — sepenuhnya web (HTML/CSS/JS statis), tanpa install apa pun.
+- **Sisi Petugas Keamanan & Kebersihan** — app Flutter Android untuk dashboard, resolve, dan push notification.
 
-Dokumen sumber lengkap (sudah ada sebelumnya, tidak diulang di sini):
-- `docs/API.md` — kontrak resmi endpoint (backend ↔ firmware ↔ web ↔ app petugas)
-- `DEVELOPMENT_GUIDE.md` — konsep, 5W1H, arsitektur, RAB, alur pengerjaan
+**Alur inti**:
+User scan QR di layar locker → isi nama & no HP → dapat kode unik 1x lihat → locker terbuka → sensor magnet auto-lock saat pintu ditutup → sesi model "parkir" (durasi dihitung, bukan ditentukan di awal). Kalau pintu tidak tertutup dalam 2 menit, backend menandai locker `needs_attention` dan mengirim push notification ke app petugas.
 
-**Peran user di project ini:** membangun web pelanggan dan app Flutter
-Android untuk Petugas Keamanan & Kebersihan.
+**Dokumen sumber lengkap**:
 
----
+- `docs/API.md` — kontrak resmi endpoint (backend ↔ firmware ↔ web ↔ app)
+- `docs/DEVELOPMENT_GUIDE.md` — konsep, 5W1H, arsitektur, RAB
+- `docs/DOKUMENTASI_TESTING_FCM.md` — testing FCM end-to-end (14 Okt 2026)
+- `firmware/DOKUMENTASI_PROGRESS_BACKEND.md` — progress backend Express (Galuh)
 
-## 2. Endpoint yang Dipakai App Petugas
-
-Sesuai `docs/API.md` bagian 10, app Flutter cuma konsumsi 3 endpoint:
-
-| Endpoint | Method | Fungsi |
-|---|---|---|
-| `/api/admin/lockers` | GET | List semua locker + status, untuk dashboard |
-| `/api/admin/lockers/{locker_id}/resolve` | POST | Tandai locker `needs_attention` kembali jadi `empty` |
-| `/api/admin/register-device` | POST | Daftarkan token FCM device petugas (dipanggil sekali di awal) |
-
-Push notification dikirim **backend → app** lewat FCM saat locker jadi
-`needs_attention` (bukan app yang polling untuk ini).
+**Peran user di project ini**: membangun web pelanggan dan app Flutter Android untuk Petugas Keamanan & Kebersihan.
 
 ---
 
-## 3. Struktur Kode yang Sudah Dibuat
+## 2. Update Progress — 14 Oktober 2026
 
-```
-lib/
-├── main.dart                       # entry point, init Firebase, routing awal
+| Komponen                    |          Status          | Detail                               |
+| --------------------------- | :----------------------: | ------------------------------------ |
+| Backend Express (Batch 1-5) |      ✅ **Selesai**      | Live di Render.com                   |
+| Login & Auth (JWT)          |      ✅ **Selesai**      | bcrypt + JWT 7 hari                  |
+| Dashboard Petugas           |      ✅ **Selesai**      | List locker, resolve, auto-refresh   |
+| Dashboard Admin             |      ✅ **Selesai**      | 2 tab: Analitik + Riwayat            |
+| FCM Notification            | ✅ **Teruji end-to-end** | Notif masuk ke HP petugas            |
+| Durasi Adaptif              |      ✅ **Selesai**      | Format "5h 8j" untuk rental panjang  |
+| Auto-Refresh (Resume)       |      ✅ **Selesai**      | `WidgetsBindingObserver`             |
+| FCM Terminated Handling     |      ✅ **Selesai**      | `getInitialMessage()`                |
+| Web Pelanggan               |    ⏳ **In Progress**    | HTML/CSS/JS statis, perlu verifikasi |
+| Integrasi fisik (hardware)  |    ⏳ **In Progress**    | Menunggu rakitan dari Alfian         |
+
+---
+
+## 3. Endpoint yang Dipakai App
+
+Sesuai `docs/API.md`, app Flutter konsumsi endpoint berikut:
+
+### Endpoint Publik
+
+| Endpoint                     | Method | Fungsi                           |
+| ---------------------------- | ------ | -------------------------------- |
+| `/api/auth/login`            | POST   | Login petugas/admin → JWT        |
+| `/api/admin/register-device` | POST   | Daftarkan FCM token (tanpa auth) |
+
+### Endpoint Admin/Petugas (JWT required)
+
+| Endpoint                          | Method | Role           | Fungsi                                    |
+| --------------------------------- | ------ | -------------- | ----------------------------------------- |
+| `/api/admin/lockers`              | GET    | admin, petugas | List locker + status untuk dashboard      |
+| `/api/admin/lockers/{id}/resolve` | POST   | admin, petugas | Tandai locker `needs_attention` → `empty` |
+| `/api/admin/reports/rentals`      | GET    | **admin only** | Laporan rentals + statistik               |
+
+> **Push notification** dikirim **backend → app** lewat FCM saat locker jadi `needs_attention` (bukan app yang polling untuk ini).
+>
+> **Base URL production**: `https://smart-locker-backend-a2ck.onrender.com/api`
+
+---
+
+## 4. Struktur Kode
+
+```text
+mprojectapp/lib/
+├── main.dart                  # Entry point, startup gate
+├── firebase_options.dart      # Auto-generated FlutterFire
+│
 ├── models/
-│   └── locker.dart                 # model Locker + enum LockerStatus
+│   ├── locker.dart            # Locker + LockerStatus enum
+│   ├── rental_record.dart     # RentalRecord + RentalStats
+│   └── session.dart           # AuthSession + UserRole
+│
 ├── services/
-│   ├── api_service.dart            # HTTP client ke 3 endpoint di atas
-│   └── fcm_service.dart            # setup permission, token FCM, register ke backend
-└── screens/
-    ├── petugas_id_screen.dart      # input nama/NIP sekali (belum ada login penuh)
-    └── dashboard_screen.dart       # list locker, tombol resolve, listener push
+│   ├── api_service.dart       # HTTP client ke Express + JWT
+│   ├── auth_service.dart      # Login/logout + session persist
+│   └── fcm_service.dart       # Firebase Cloud Messaging
+│
+├── screens/
+│   ├── login_screen.dart      # Form login username/password
+│   ├── dashboard_screen.dart  # Dashboard Petugas (locker list)
+│   ├── admin_home_screen.dart # Container Admin (bottom nav)
+│   ├── admin_analytics_screen.dart # Tab 1: statistik
+│   ├── admin_history_screen.dart   # Tab 2: riwayat + filter
+│   └── petugas_id_screen.dart # (Legacy) input nama/NIP
+│
+├── utils/
+│   └── duration_formatter.dart # Format adaptif "5h 8j"
+│
+└── widgets/
+    └── dashboard_widgets.dart # ProfileHeader, StatGrid, dll
 ```
 
-### Detail tiap file
+### Detail Tiap File
 
-**`models/locker.dart`**
-Model `Locker` dengan `LockerStatus` enum (`empty`, `occupied`,
-`needsAttention`, `unknown`). Punya helper `displayDuration` (format durasi
-occupied jadi "Xj Ym Zd") dan `needsAttentionSince` (format relatif, mis.
-"7 menit lalu").
-
-**`services/api_service.dart`**
-- Konstanta `kApiBaseUrl` — placeholder `https://<domain-backend>/api`, **belum diisi** karena backend belum ada.
-- Konstanta `kUseMockData = true` — **saat ini aktif**. Semua fungsi (`fetchLockers`, `resolveLocker`, `registerDevice`) dialihkan ke `_MockBackend` in-memory, tidak ada HTTP request sama sekali.
-- `_MockBackend` menyimpan 4 locker dummy (`locker_01`–`04`) dengan campuran status `empty`/`occupied`/`needsAttention`, durasi occupied nambah otomatis tiap `fetchLockers()` dipanggil, dan `resolveLocker()` beneran mengubah state locker jadi `empty`.
-- **Cara balik ke backend asli nanti:** set `kUseMockData = false`, isi `kApiBaseUrl` dengan domain asli.
-
-**`services/fcm_service.dart`**
-- `initAndRegister(petugasId)` — minta permission notifikasi, ambil token FCM, panggil `registerDevice`, dan auto re-register kalau token berubah (`onTokenRefresh`).
-- Simpan `petugasId` di `SharedPreferences` lokal (key: `petugas_id`) supaya tidak perlu isi ulang tiap buka app.
-- `firebaseMessagingBackgroundHandler` — top-level function wajib untuk handle push saat app di-background/terminated (didaftarkan di `main.dart`).
-- Expose `onForegroundMessage` dan `onMessageOpenedApp` sebagai stream untuk didengarkan `DashboardScreen`.
-
-**`screens/petugas_id_screen.dart`**
-Form sederhana: input nama/NIP → panggil `fcmService.initAndRegister()` →
-kalau sukses, pindah ke `DashboardScreen`. Ini dipakai karena dokumen
-menyebutkan prototipe belum pakai login/PIN staf penuh.
-
-**`screens/dashboard_screen.dart`**
-- `GET /admin/lockers` saat pertama buka + auto-refresh tiap 10 detik (`Timer.periodic`) + refresh tambahan tiap ada push masuk (foreground atau tap notifikasi).
-- List locker dengan warna status (hijau/oranye/merah) dan info durasi/waktu needs_attention.
-- Tombol **Resolve** cuma muncul untuk locker `needsAttention`, dengan dialog konfirmasi sebelum manggil `resolveLocker()`.
-
-**`main.dart`**
-- `Firebase.initializeApp()` + daftar `firebaseMessagingBackgroundHandler` sebelum `runApp()`.
-- `_StartupGate`: cek apakah `petugas_id` sudah tersimpan lokal — kalau sudah, langsung re-register token & masuk `DashboardScreen`; kalau belum, ke `PetugasIdScreen`.
-- **Butuh** file `firebase_options.dart` di folder yang sama (di-generate `flutterfire configure`, sudah dijalankan — lihat bagian 4).
+- **`main.dart`**: `Firebase.initializeApp()` + daftar `firebaseMessagingBackgroundHandler` sebelum `runApp()`. `_StartupGate`: cek `AuthService.getSavedSession()`. Tidak ada session → `LoginScreen`. Role petugas → re-register FCM + `DashboardScreen`. Role admin → `AdminHomeScreen`.
+- **`models/locker.dart`**: Model `Locker` dengan `LockerStatus` enum (`empty`, `occupied`, `needsAttention`). Helper `displayDuration` — format adaptif: < 1 menit "45s", < 1 jam "5m 20s", < 1 hari "2j 15m", < 30 hari "5h 8j", >= 30 hari "1bl 12j". Helper `needsAttentionSinceLabel` — format relatif, mis. "7 menit lalu".
+- **`models/rental_record.dart`**: Model `RentalRecord` + `RentalStats`. `busiestLockerId` nullable (backend kadang kirim null). Helper `displayDuration` — pakai `duration_formatter.dart` yang sama.
+- **`models/session.dart`**: `AuthSession` dengan `token`, `role`, `nama`. `UserRole` enum (`admin`, `petugas`).
+- **`services/api_service.dart`**: `kApiBaseUrl = 'https://smart-locker-backend-a2ck.onrender.com/api'`. Tidak ada mock data — selalu hit Express asli. `_token` di-set setelah login, auto-attach ke header `Authorization: Bearer`.
+- **`services/auth_service.dart`**: Login → simpan session + set token ke `ApiService`. Logout → hapus session + clear token. `getSavedSession()` → restore session + re-set token. Key: `auth_session` (di `SharedPreferences`).
+- **`services/fcm_service.dart`**: `initAndRegister(petugasId)`: request permission, ambil token FCM, POST ke `/admin/register-device`. Bind `onTokenRefresh` sekali saja (static flag). `firebaseMessagingBackgroundHandler` — top-level function. Expose stream `onForegroundMessage` + `onMessageOpenedApp`.
+- **`utils/duration_formatter.dart`**: Helper `formatDuration(Duration d)` — logika: >= 30 hari → "Xbl Yj", >= 1 hari → "Xh Yj", >= 1 jam → "Xj Ym", >= 1 menit → "Xm Ys", < 1 menit → "Xs".
+- **`screens/login_screen.dart`**: Form username + password. Panggil `AuthService.login()`. Kalau role petugas → `fcmService.initAndRegister(nama)`. Navigate berdasarkan role.
+- **`screens/dashboard_screen.dart` (Petugas)**: Polling 10 detik via `Timer.periodic`. Auto-refresh saat app resume (via `WidgetsBindingObserver`, throttle 30s). FCM terminated handling via `getInitialMessage()`. List locker dengan warna status (Hijau/Oranye/Merah) + tombol Resolve (dialog konfirmasi → POST ke Express → refresh).
+- **`screens/admin_home_screen.dart`**: Bottom navigation dengan 2 tab. Data di-fetch sekali di parent. `IndexedStack` untuk keep-alive. `WidgetsBindingObserver` untuk auto-refresh saat resume.
+- **`screens/admin_analytics_screen.dart` (Tab 1)**: Kartu statistik (Total Sewa, Sedang Aktif, Rata-rata Durasi, Paling Sering), Status Locker overview, Status Sewa, Top 3 Locker.
+- **`screens/admin_history_screen.dart` (Tab 2)**: Filter chips (**Semua / Aktif / Selesai** dengan count), list riwayat rental dengan badge status, durasi terformat, no HP ter-mask dari backend, pull-to-refresh.
+- **`screens/petugas_id_screen.dart`**: Legacy (tidak dipakai lagi, login pakai JWT Express).
 
 ---
 
-## 4. Log Setup & Troubleshooting (Kronologis)
+## 5. Fitur yang Sudah Berfungsi
 
-Ini histori masalah yang sudah ditemui & solusinya, biar tidak perlu
-mengulang riset kalau ketemu masalah serupa lagi:
+### Auth & Session
 
-1. **`flutter pub get`** — dependency (`firebase_core`, `firebase_messaging`, `http`, `shared_preferences`) berhasil terpasang. Muncul warning "Building with plugins requires symlink support" karena Windows butuh **Developer Mode** aktif → diaktifkan lewat Settings → Privacy & security → For developers.
-2. **`flutterfire` command not found** — karena `dart pub global activate flutterfire_cli` menaruh binary di `%LOCALAPPDATA%\Pub\Cache\bin`, yang belum ada di PATH. Solusi sementara: panggil lewat path lengkap, `& "$env:LOCALAPPDATA\Pub\Cache\bin\flutterfire.bat" configure`. Solusi permanen: tambahkan folder itu ke PATH via Environment Variables, lalu buka terminal baru.
-3. **Firebase CLI belum terinstall** — `flutterfire configure` butuh `firebase` CLI resmi (Node.js package terpisah). Diinstall lewat `npm install -g firebase-tools`, lalu `firebase login`.
-4. **Timeout + "Failed to authenticate"** saat `firebase projects:create` — sesi login kepakai gak valid. **Catatan penting:** command `logout`/`login`/`login:list` itu milik **`firebase` CLI**, bukan `flutterfire` — sempat salah panggil `flutterfire logout` yang error karena command itu tidak ada di situ. Solusi: `firebase logout` → `firebase login` (pakai `--no-localhost` kalau browser gagal redirect balik).
-5. **"Failed to add Firebase to Google Cloud Platform project"** saat create project baru lewat CLI — solusinya bikin project manual dulu lewat [console.firebase.google.com](https://console.firebase.google.com), baru pilih project itu di `flutterfire configure` (tanpa opsi create-new).
-6. **`flutterfire configure` masih "Found 0 Firebase projects"** meski project sudah dibuat di console — penyebabnya akun yang login di CLI (`firebase login:list`) beda dengan akun yang dipakai bikin project di browser. Setelah disamakan akunnya, berhasil.
-7. **`flutterfire configure` akhirnya berhasil** — file `firebase_options.dart` sudah ter-generate.
-8. **Backend belum ada** (masih tahap prototipe) — diputuskan pakai **mock data in-memory** di `api_service.dart` (`kUseMockData = true`) supaya UI tetap bisa didemo/dites tanpa nunggu backend. Detail lihat bagian 3.
-9. **`AndroidManifest.xml`** — ditambahkan `<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />` sebagai *sibling* dari `<application>`, bukan di dalamnya, untuk dukungan permission notifikasi Android 13+.
+- ✅ Login via Express (bcrypt verify)
+- ✅ Session persist di `SharedPreferences`
+- ✅ Auto-login saat app dibuka
+- ✅ Logout clear session + token
+
+### Dashboard Petugas
+
+- ✅ List 4 locker dari Express
+- ✅ Polling 10 detik & auto-refresh saat app resume (throttle 30s)
+- ✅ Statistik count: Kosong / Terisi / Perhatian
+- ✅ Resolve locker via tombol + dialog
+- ✅ Error handling (401, 409, timeout) & pull-to-refresh
+
+### Dashboard Admin
+
+- ✅ 2 tab: Analitik + Riwayat (bottom nav)
+- ✅ Statistik rentals & status locker overview
+- ✅ Riwayat rentals dengan filter chips & no HP ter-mask otomatis
+
+### FCM Notification
+
+- ✅ Register token saat login petugas & auto re-register saat token refresh
+- ✅ **Foreground** → snackbar + refresh
+- ✅ **Background & Terminated** → notif di system tray, tap → buka app + refresh
+- ✅ **Teruji end-to-end** (lihat `docs/DOKUMENTASI_TESTING_FCM.md`)
+
+### UI/UX
+
+- ✅ Durasi adaptif ("5h 8j" untuk rental panjang)
+- ✅ Warna status konsisten (hijau/oranye/merah)
+- ✅ Material Design 3, loading state, empty state, error state
 
 ---
 
-## 5. Status Saat Ini
+## 6. Log Setup & Troubleshooting (Kronologis)
 
-- [x] Struktur kode Flutter app petugas lengkap (5 file di `lib/`)
-- [x] Dependency terpasang (`pubspec.yaml`)
-- [x] `flutterfire configure` berhasil, `firebase_options.dart` ada
-- [x] `AndroidManifest.xml` sudah ditambah permission notifikasi
-- [x] Mode mock data aktif untuk demo tanpa backend
-- [ ] **Belum ditest jalan** — user belum punya emulator, dan belum sempat coba run di device fisik
-- [ ] Backend asli belum dibangun (masih di luar scope sesi ini)
-- [ ] `kApiBaseUrl` masih placeholder, perlu diisi kalau backend sudah ada
-- [ ] Web pelanggan belum dimulai sama sekali
+1. **Setup Awal**: `flutter pub get`. Warning symlink di Windows diatasi dengan aktifkan **Developer Mode** di Settings.
+2. **Flutterfire & Firebase CLI**: Instalasi Firebase CLI via npm, login, dan konfigurasi project manual via web console jika timeout.
+3. **Migrasi Mock → Express**:
+   - `LockerStatus.unknown` dihapus (enum cuma 3: `empty`, `occupied`, `needsAttention`).
+   - Gradle `Read timed out` diatasi dengan turunkan `-Xmx` di `gradle.properties`.
+   - Firestore `PERMISSION_DENIED` diatasi dengan publish rules.
+   - `PlatformException` diatasi dengan `flutter clean`.
+4. **Arsitektur Final**: Express = single source of truth. Flutter tidak akses Firestore langsung. Firestore Rules dikunci total (`allow read, write: if false`). JWT auto-attach di setiap request admin.
+5. **FCM**:
+   - Token dummy dibersihkan dari `petugas_devices`.
+   - Pengujian harus mensimulasikan state `occupied` + `unlockedSince` (bukan set `needs_attention` manual).
 
 ---
 
-## 6. Langkah Selanjutnya (Belum Dikerjakan)
+## 7. Status Saat Ini
 
-1. **Test app** — karena belum ada emulator, opsinya:
-   - Colok HP Android fisik (aktifkan USB debugging di Developer Options), lalu `flutter run`
-   - Atau install emulator lewat Android Studio (AVD Manager) kalau mau tanpa device fisik
-2. Kalau app berhasil jalan dengan mock data, verifikasi alur: `PetugasIdScreen` → izin notifikasi → `DashboardScreen` tampil 4 locker dummy → tombol Resolve mengubah status locker_03 jadi kosong.
-3. Setelah app dari sisi UI beres, mulai kerjakan **web pelanggan** (belum ada progress sama sekali): halaman hasil scan barcode yang render 3 kondisi (`empty`/`occupied`/`needs_attention`) sesuai endpoint 1–4 di `docs/API.md`.
-4. Backend asli (di luar scope user langsung, tapi jadi blocker untuk `kUseMockData = false`) — kalau backend sudah mulai dibangun pihak lain, koordinasikan domain/URL untuk diisi ke `kApiBaseUrl`.
+### Sudah Selesai ✅
+
+- [x] Struktur kode Flutter lengkap (11 file di `lib/`)
+- [x] Dependency terpasang (`http`, `shared_preferences`, `firebase_core`, `firebase_messaging`, `google_fonts`)
+- [x] `firebase_options.dart` ada
+- [x] Login via Express (JWT + bcrypt)
+- [x] Dashboard petugas (polling 10 detik, resolve)
+- [x] Dashboard admin (2 tab: Analitik + Riwayat)
+- [x] Statistik admin & riwayat rentals dengan filter
+- [x] Durasi adaptif (`duration_formatter.dart`)
+- [x] Auto-refresh saat app resume & FCM lengkap (foreground, background, terminated)
+- [x] **FCM teruji end-to-end**
+- [x] AndroidManifest.xml sudah ditambah permission notifikasi
+
+### Belum Selesai ⏳
+
+- [ ] **Web pelanggan** — HTML/CSS/JS statis di `mprojectapp/web/public/`, perlu verifikasi fungsional
+- [ ] **Render anti-sleep** — cron ping untuk demo smooth
+- [ ] **Integrasi fisik** — rakitan hardware (menunggu Alfian)
+- [ ] **Production hardening** — ganti password default, audit rules
+
+---
+
+## 8. Langkah Selanjutnya
+
+### Prioritas Tinggi
+
+1. **Setup Render anti-sleep** — pakai cron-job.org ping tiap 10 menit supaya tidak cold start 30-60 detik.
+2. **Verifikasi web pelanggan** — cek `mprojectapp/web/public/index.html` sudah bisa scan QR + sewa atau belum.
+3. **Update dokumentasi backend** — sinkron `docs/API.md` dengan implementation terbaru.
+4. **Production hardening**: ganti password default, verifikasi `JWT_SECRET` di Render, audit Firestore Rules.
+
+### Prioritas Sedang
+
+5. **Testing skenario tambahan**: FCM saat app background/minimize/terminated, multiple petugas, deep link notif.
+6. **Web pelanggan**: halaman scan browser, form sewa, kode unik & tombol copy, input kode unik.
+
+### Prioritas Rendah
+
+7. **Polish UI**: dark mode, animasi transisi, grafik analitik.
+8. **Fitur tambahan**: export CSV riwayat, filter tanggal di reports, multi-bahasa.
+
+---
+
+## 9. Cara Test
+
+### Backend Express
+
+```bash
+# Health check
+curl https://smart-locker-backend-a2ck.onrender.com/
+
+# Login
+curl -X POST https://smart-locker-backend-a2ck.onrender.com/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}'
+```
+
+### Flutter App
+
+```bash
+cd mprojectapp
+flutter clean
+flutter pub get
+flutter run
+```
+
+### Test FCM
+
+Ikuti step di `docs/DOKUMENTASI_TESTING_FCM.md`:
+
+1. Login petugas di HP
+2. Set `lockers/locker_02`: `status: "occupied"` + `unlockedSince: 3 menit lalu`
+3. Tunggu 30-60 detik
+4. Cek notif di HP + log di Render
+
+---
+
+## 10. Referensi
+
+| File                                       | Deskripsi                                            |
+| ------------------------------------------ | ---------------------------------------------------- |
+| `lib/main.dart`                            | Entry point + startup gate                           |
+| `lib/models/*.dart`                        | Model Locker, RentalRecord, AuthSession              |
+| `lib/services/*.dart`                      | ApiService, AuthService, FcmService                  |
+| `lib/screens/*.dart`                       | Login, Dashboard (petugas), Admin (analitik+riwayat) |
+| `lib/utils/duration_formatter.dart`        | Format durasi adaptif                                |
+| `lib/widgets/dashboard_widgets.dart`       | Widget reusable                                      |
+| `docs/API.md`                              | Kontrak resmi endpoint                               |
+| `docs/DOKUMENTASI_TESTING_FCM.md`          | Testing FCM end-to-end                               |
+| `firmware/DOKUMENTASI_PROGRESS_BACKEND.md` | Progress backend (Galuh)                             |
+
+---
+
+## 11. Akun Testing
+
+| Username   | Password     | Role      |
+| ---------- | ------------ | --------- |
+| `admin`    | `admin123`   | `admin`   |
+| `petugas1` | `petugas123` | `petugas` |
+
+⚠️ _Ganti password ini sebelum demo production!_
