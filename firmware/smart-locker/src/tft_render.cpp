@@ -5,11 +5,20 @@
 #include <SPI.h>
 #include <qrcode.h>
 
-// Buat instance TFT per locker (4 unit)
-// RST = -1 karena kita tie ke 3.3V
+// Pin RES TFT (modul tanpa CS butuh reset dari GPIO, tidak cukup ke 3V3).
+// Boleh dipindah ke config.h kalau mau.
+#ifndef TFT_RST_PIN
+#define TFT_RST_PIN 5
+#endif
+
+// QR standar: modul gelap di latar terang (agar bisa dibaca kamera/scanner)
+#define QR_DARK_COLOR 0x0000
+#define QR_LIGHT_COLOR 0xFFFF
+
 static Adafruit_ST7789 *tft[NUM_LOCKERS] = {nullptr};
 
-void tft_init() {
+void tft_init()
+{
   // Setup backlight
   pinMode(TFT_BLK_PIN, OUTPUT);
   digitalWrite(TFT_BLK_PIN, HIGH);
@@ -18,25 +27,29 @@ void tft_init() {
   // Inisialisasi hardware SPI
   SPI.begin(TFT_SCLK_PIN, -1, TFT_MOSI_PIN, -1);
 
-  for (int i = 0; i < ACTIVE_LOCKERS; i++) {
-    tft[i] = new Adafruit_ST7789(TFT_CS_PINS[i], TFT_DC_PINS[i], -1);
+  for (int i = 0; i < ACTIVE_LOCKERS; i++)
+  {
+    tft[i] = new Adafruit_ST7789(TFT_CS_PINS[i], TFT_DC_PINS[i], TFT_RST_PIN);
 
-    tft[i]->init(240, 240);
+    // Modul tanpa pin CS terbukti hanya merespons di SPI mode 3
+    tft[i]->init(240, 240, SPI_MODE3);
     tft[i]->setRotation(0);
     tft[i]->fillScreen(TFT_BG_COLOR);
 
-    Serial.printf("[TFT] Init locker %d (CS=%d, DC=%d)\n", i, TFT_CS_PINS[i],
-                  TFT_DC_PINS[i]);
+    Serial.printf("[TFT] Init locker %d (CS=%d, DC=%d, RST=%d)\n", i,
+                  TFT_CS_PINS[i], TFT_DC_PINS[i], TFT_RST_PIN);
   }
 }
 
-void tft_clear(int idx) {
+void tft_clear(int idx)
+{
   if (idx < 0 || idx >= ACTIVE_LOCKERS || tft[idx] == nullptr)
     return;
   tft[idx]->fillScreen(TFT_BG_COLOR);
 }
 
-void tft_render_qr(int idx, const char *lockerId, const char *token) {
+void tft_render_qr(int idx, const char *lockerId, const char *token)
+{
   if (idx < 0 || idx >= ACTIVE_LOCKERS || tft[idx] == nullptr)
     return;
 
@@ -61,25 +74,27 @@ void tft_render_qr(int idx, const char *lockerId, const char *token) {
   int offsetX = (TFT_WIDTH - totalQrSize) / 2;
   int offsetY = (TFT_HEIGHT - totalQrSize) / 2;
 
-  // Clear screen + gambar
-  tft[idx]->fillScreen(TFT_BG_COLOR);
+  // Latar putih (sekaligus quiet zone), lalu gambar hanya modul gelap
+  tft[idx]->fillScreen(QR_LIGHT_COLOR);
   tft[idx]->startWrite();
 
-  // Render tiap modul QR
-  for (uint8_t y = 0; y < qrcode.size; y++) {
-    for (uint8_t x = 0; x < qrcode.size; x++) {
-      uint16_t color =
-          qrcode_getModule(&qrcode, x, y) ? TFT_FG_COLOR : TFT_BG_COLOR;
+  for (uint8_t y = 0; y < qrcode.size; y++)
+  {
+    for (uint8_t x = 0; x < qrcode.size; x++)
+    {
+      if (!qrcode_getModule(&qrcode, x, y))
+        continue;
       int px = offsetX + (x + QR_QUIET_ZONE) * moduleSize;
       int py = offsetY + (y + QR_QUIET_ZONE) * moduleSize;
-      tft[idx]->fillRect(px, py, moduleSize, moduleSize, color);
+      tft[idx]->fillRect(px, py, moduleSize, moduleSize, QR_DARK_COLOR);
     }
   }
 
   tft[idx]->endWrite();
 }
 
-void tft_render_message(int idx, const char *line1, const char *line2) {
+void tft_render_message(int idx, const char *line1, const char *line2)
+{
   if (idx < 0 || idx >= ACTIVE_LOCKERS || tft[idx] == nullptr)
     return;
 

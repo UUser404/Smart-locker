@@ -287,10 +287,12 @@ backend-express/
 Dari output `seedController.js`:
 
 ```text
-[seed] authToken: 70cd4fbd2fd930b1844d7dcff3bb9270
+[seed] authToken: <DEVICE_TOKEN>
 ```
 
 Simpan token ini di firmware `config.h` sebagai `DEVICE_TOKEN`. Untuk test manual via Thunder Client, kirim header `X-Device-Token`.
+
+> Jangan menulis token asli di dokumen atau commit. Ambil dari output seed atau dari Firestore (`controllers/esp32_01.authToken`).
 
 ---
 
@@ -355,6 +357,10 @@ Histori masalah & solusinya:
 17. `[Sync] HTTP 404 Cannot POST /api/firmware/esp32_01/sync` — endpoint `/sync` belum ke-commit/deploy. Solusi: commit backend, push, deploy Render.
 18. **`401 INVALID_DEVICE_TOKEN` dengan token yang "sama"`** — 1 karakter hilang saat copy-paste token. Solusi: copy token dari Firestore Console (`controllers/esp32_01.authToken`), bandingkan karakter-per-karakter.
 19. FCM notification test offline — kalau HP penerima tidak terhubung internet, notifikasi tertahan di FCM dan baru muncul saat HP kembali online. Ini behavior by design (FCM TTL default 4 minggu). Sudah tested dan bekerja sesuai harapan.
+20. `pins_arduino.h: No such file or directory` saat build firmware — paket framework Arduino-ESP32 di PlatformIO tidak lengkap. Solusi: hapus folder `framework-arduinoespressif32` di `.platformio\packages` (folder `.platformio` tersembunyi di Windows), lalu build ulang agar diunduh lagi.
+21. TFT: backlight menyala tapi layar gelap — modul ST7789 7 pin **tanpa CS** tidak merespons dengan pengaturan default. Solusi (terbukti di bench test 15 Okt 2026): **SPI mode 3** dan **RES dari GPIO 5** (bukan ke 3V3).
+22. `main.cpp` tidak bisa di-compile — penanda konflik merge (`<<<<<<<`, `>>>>>>>`) tersisa. Solusi: hapus penanda dan gabungkan kedua sisi.
+23. `undefined reference to setup()/loop()` di env tes (`rawtft`/`bench`) — file tes tidak ikut terkompilasi oleh `build_src_filter`. Solusi: pastikan nama file persis dan di `src/`, lalu `pio run -e <env> -t clean` dan build ulang.
 
 ---
 
@@ -380,9 +386,10 @@ Histori masalah & solusinya:
 - ☑ `wifi_client` — connect + reconnect (tested)
 - ☑ `backend_poller` (sync mode) — tested end-to-end
 - ☑ `lock_control` — compile OK, belum test relay fisik
-- ☑ `door_sensor` — compile OK, tested via jumper
-- ☑ `event_reporter` — terintegrasi ke `/sync`
-- ☑ `tft_render` — compile OK, dry-run
+- ☑ `door_sensor` — compile OK, tested via jumper. **Direvisi 15 Okt:** debounce stabil, state awal dari pin, hanya `ACTIVE_LOCKERS` (belum diuji ulang)
+- ☑ `event_reporter` — terintegrasi ke `/sync` (`report_door_event()` tidak dipakai di alur utama)
+- ◐ `tft_render` — **15 Okt:** layar merespons di hardware asli (SPI mode 3, RES GPIO 5), teks tampil; **QR belum tampil**
+- ◐ `main.cpp` — **15 Okt:** direvisi (auto-lock saat pintu tertutup / batas `UNLOCK_HOLD_MS`, `openLatch`, `forceSync`, redraw QR hanya saat token berubah, konflik merge dibersihkan); belum diuji di hardware
 - ☑ `config.h` di-set untuk 2 locker (`ACTIVE_LOCKERS 2` di production mode)
 
 ### App Petugas (Reza):
@@ -398,6 +405,13 @@ Histori masalah & solusinya:
 - □ Test end-to-end hardware fisik (butuh relay + solenoid + sensor + TFT dari Alfian)
 - □ Ganti password default `admin`/`petugas1`
 - □ Merge `feature/firmware` ke `main` lewat Pull Request
+- □ Debug QR di TFT (`tft_render_qr`) — belum tampil di hardware
+- □ Uji limit switch di hardware (ditunda)
+- □ Build & uji firmware penuh (`pio run -e esp32dev`) dengan `main.cpp` revisi
+- □ Uji relay + solenoid; konfirmasi baut kunci bisa re-latch saat pintu ditutup (asumsi auto-lock)
+- □ Samakan `ACTIVE_LOCKERS` di `config.h` dengan skala 2 locker (versi yang terakhir dicek: development = 1, production = 4)
+- □ Putuskan solusi 2 TFT tanpa pin CS (modul ber-CS atau bus SPI terpisah)
+- □ Atasi cold start Render (30–60 dtk) vs watchdog firmware (30 dtk): naikkan WDT atau cron anti-sleep
 
 ---
 
@@ -427,6 +441,7 @@ Histori masalah & solusinya:
   - `Locker_01`: `CS=4`, `DC=16`
   - `Locker_02`: `CS=13`, `DC=17`
   - (`CS=14/DC=21` dan `CS=33/DC=22` idle untuk `locker_03/04`)
+  - **Update 15 Okt (bench test 1 layar):** modul TFT yang dipakai 7 pin **tanpa CS** → wajib **SPI mode 3** dan **RES ke GPIO 5**. Pin CS di atas hanya berlaku untuk modul yang punya pin CS. Untuk 2 layar tanpa CS perlu keputusan (belum diuji).
 - Solenoid 12V fail-secure × 2 + adaptor 12V ≥2A + diode flyback
 - Detail wiring lengkap: lihat `firmware/HARDWARE_WIRING_GUIDE.md`
 
@@ -465,6 +480,8 @@ Anti alarm fatigue di `fcmService.js`:
 - `docs/API.md` adalah kontrak resmi — setiap perubahan endpoint, update dokumen dulu.
 - Firmware dan backend harus sinkron — kalau ganti endpoint firmware, update `config.h` juga.
 - Skala prototype = 2 locker — semua dokumentasi dan kode harus konsisten dengan angka ini.
+- Env PlatformIO: `esp32dev` (firmware penuh), `bench` (tes TFT dengan library), `rawtft` (tes TFT mentah, SPI mode 3). Detail di `firmware/smart_locker_firmware_documentation.md`.
+- Pengujian hardware berjalan bertahap: TFT dulu (mentah → library → QR), baru limit switch, lalu relay/solenoid.
 
 ---
 
@@ -496,3 +513,16 @@ Anti alarm fatigue di `fcmService.js`:
 | 10. FCM            | Section diubah jadi "DONE" dengan checklist centang                                           |
 | 10. Optional       | Tambah improvement anti-alarm-fatigue sebagai opsional                                        |
 | 11. Catatan        | Tambah poin "Skala prototype = 2 locker"                                                      |
+
+---
+
+## Rekap Perubahan — Update 15 Okt 2026
+
+| Section            | Yang diubah                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| 5. Device Token    | Token asli diganti `<DEVICE_TOKEN>` + catatan jangan menulis token di dokumen                                      |
+| 7. Troubleshooting | Tambah #20–23: `pins_arduino.h`, TFT backlight nyala layar gelap, konflik merge, `setup()` hilang                  |
+| 8. Status Firmware | `door_sensor` direvisi; `tft_render` dan `main.cpp` ditandai sebagian/belum diuji                                  |
+| 8. Belum           | Tambah debug QR TFT, uji limit switch, build penuh, uji relay, `ACTIVE_LOCKERS`, 2 TFT tanpa CS, WDT vs cold start |
+| 10. Hardware       | Catatan modul TFT tanpa CS (SPI mode 3, RES GPIO 5)                                                                |
+| 11. Catatan        | Env PlatformIO + urutan uji hardware                                                                               |

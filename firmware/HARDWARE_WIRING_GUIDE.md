@@ -12,25 +12,30 @@ hardware. Ikuti urutan dari bench test sampai full assembly.
 > disiapkan), tapi yang diaktifkan via `ACTIVE_LOCKERS 2`. Pin index
 > 2-3 tidak dipakai — biarkan kosong.
 
+> **Update 15 Okt 2026 (hasil bench test TFT):** modul TFT yang dipakai bench
+> test adalah ST7789 **7 pin tanpa pin CS**. Layar baru merespons dengan
+> **SPI mode 3** dan **RES dihubungkan ke GPIO 5** (bukan ke 3V3). Lihat
+> bagian 3d dan Test TFT. Limit switch dan relay/solenoid **belum diuji**.
+
 ---
 
 ## 1. Daftar Komponen
 
 ### Wajib
 
-| Komponen                     | Jumlah | Spesifikasi                         | Keterangan                        |
-| ---------------------------- | ------ | ----------------------------------- | --------------------------------- |
-| ESP32 DevKit                 | 1      | 38-pin, ESP32-D0WDQ6                | Sudah ada                         |
-| Relay module                 | 1      | 4-channel, aktif LOW, 5V            | 2 channel dipakai, 2 channel idle |
-| Solenoid door lock           | 2      | 12V, fail-secure                    | 1 per locker                      |
-| Sensor magnet / limit switch | 2      | NC atau NO, 2 kabel                 | 1 per locker                      |
-| Resistor                     | 2      | 10 kΩ, 1/4 W                        | **Wajib** pull-up untuk sensor    |
-| TFT IPS ST7789               | 2      | 1.3", 240×240, SPI                  | 1 per locker                      |
-| Adaptor 12V                  | 1      | ≥ 2 A (2 solenoid × 0.6 A + margin) | Suplai utama                      |
-| Buck converter               | 1      | 12V → 5V, ≥ 2 A                     | Untuk ESP32 + relay               |
-| Diode 1N4007                 | 2-4    | 1 A, 1000 V                         | Flyback protection solenoid       |
-| Terminal block               | 2-3    | 2 atau 4 jalur                      | Pembagi daya                      |
-| Kabel jumper                 | 20+    | Male-male, male-female              |                                   |
+| Komponen                     | Jumlah | Spesifikasi                         | Keterangan                                          |
+| ---------------------------- | ------ | ----------------------------------- | --------------------------------------------------- |
+| ESP32 DevKit                 | 1      | 38-pin, ESP32-D0WDQ6                | Sudah ada                                           |
+| Relay module                 | 1      | 4-channel, aktif LOW, 5V            | 2 channel dipakai, 2 channel idle                   |
+| Solenoid door lock           | 2      | 12V, fail-secure                    | 1 per locker                                        |
+| Sensor magnet / limit switch | 2      | NC atau NO, 2 kabel                 | 1 per locker                                        |
+| Resistor                     | 2      | 10 kΩ, 1/4 W                        | **Wajib** pull-up untuk sensor                      |
+| TFT IPS ST7789               | 2      | 1.3", 240×240, SPI                  | 1 per locker. Modul bench test: 7 pin, **tanpa CS** |
+| Adaptor 12V                  | 1      | ≥ 2 A (2 solenoid × 0.6 A + margin) | Suplai utama                                        |
+| Buck converter               | 1      | 12V → 5V, ≥ 2 A                     | Untuk ESP32 + relay                                 |
+| Diode 1N4007                 | 2-4    | 1 A, 1000 V                         | Flyback protection solenoid                         |
+| Terminal block               | 2-3    | 2 atau 4 jalur                      | Pembagi daya                                        |
+| Kabel jumper                 | 20+    | Male-male, male-female              |                                                     |
 
 ### Opsional / Cadangan
 
@@ -51,20 +56,21 @@ Dari `firmware/smart-locker/src/config.h` — **jangan ubah tanpa kabari Galuh**
 
 ### Pin Aktif (dipakai)
 
-| Fungsi                    | GPIO | Mode       | Keterangan              |
-| ------------------------- | ---- | ---------- | ----------------------- |
-| **Relay IN1** (locker_01) | 25   | Output     | Aktif LOW               |
-| **Relay IN2** (locker_02) | 26   | Output     | Aktif LOW               |
-| **Sensor 0** (locker_01)  | 34   | Input-only | Butuh pull-up eksternal |
-| **Sensor 1** (locker_02)  | 35   | Input-only | Butuh pull-up eksternal |
-| **TFT SCLK** (shared)     | 18   | Output SPI | Semua TFT paralel       |
-| **TFT MOSI/SDA** (shared) | 23   | Output SPI | Semua TFT paralel       |
-| **TFT BLK** (shared)      | 19   | Output     | Bisa juga langsung 3.3V |
-| **TFT CS0** (locker_01)   | 4    | Output     | Chip Select locker_01   |
-| **TFT CS1** (locker_02)   | 13   | Output     | Chip Select locker_02   |
-| **TFT DC0** (locker_01)   | 16   | Output     | Data/Command locker_01  |
-| **TFT DC1** (locker_02)   | 17   | Output     | Data/Command locker_02  |
-| Status LED                | 2    | Output     | Built-in di board       |
+| Fungsi                    | GPIO | Mode       | Keterangan                                                                |
+| ------------------------- | ---- | ---------- | ------------------------------------------------------------------------- |
+| **Relay IN1** (locker_01) | 25   | Output     | Aktif LOW                                                                 |
+| **Relay IN2** (locker_02) | 26   | Output     | Aktif LOW                                                                 |
+| **Sensor 0** (locker_01)  | 34   | Input-only | Butuh pull-up eksternal                                                   |
+| **Sensor 1** (locker_02)  | 35   | Input-only | Butuh pull-up eksternal                                                   |
+| **TFT SCLK** (shared)     | 18   | Output SPI | Semua TFT paralel                                                         |
+| **TFT MOSI/SDA** (shared) | 23   | Output SPI | Semua TFT paralel                                                         |
+| **TFT BLK** (shared)      | 19   | Output     | Bisa juga langsung 3.3V                                                   |
+| **TFT RES** (shared)      | 5    | Output     | Pulsa reset dari firmware (`TFT_RST_PIN`). Modul tanpa CS: jangan ke 3.3V |
+| **TFT CS0** (locker_01)   | 4    | Output     | Chip Select locker_01 (hanya modul yang punya pin CS)                     |
+| **TFT CS1** (locker_02)   | 13   | Output     | Chip Select locker_02 (hanya modul yang punya pin CS)                     |
+| **TFT DC0** (locker_01)   | 16   | Output     | Data/Command locker_01                                                    |
+| **TFT DC1** (locker_02)   | 17   | Output     | Data/Command locker_02                                                    |
+| Status LED                | 2    | Output     | Built-in di board                                                         |
 
 ### Pin Idle (tidak dipakai untuk prototype 2 locker)
 
@@ -109,8 +115,6 @@ pull-up internal. **Wajib pakai resistor 10kΩ ke 3.3V.**
        │
        └──── GND ── Common Ground (semua GND gabung)
 ```
-
-````
 
 **Catatan penting:**
 
@@ -167,6 +171,11 @@ GND
 
 **Untuk locker_02:** sama persis, tapi ke `GPIO 35`.
 
+**Limit switch:** sambungkan ke terminal **C** dan **NO** (bukan NC), dan pastikan
+pintu benar-benar menekan tuasnya saat tertutup. Kalau tersambung ke NC,
+logika terbuka/tertutup terbalik. _Pengujian limit switch di hardware ditunda
+(belum dilakukan)._
+
 **Cara kerja:**
 
 - Pintu **tertutup** → magnet dekat → sensor konduktif → GPIO = **LOW**
@@ -178,7 +187,28 @@ GND
 - Ditekan (pintu tertutup) → konduktif → LOW
 - Tidak ditekan (pintu terbuka) → terbuka → HIGH
 
-### 3d. TFT ST7789 2 Display (SPI shared)
+### 3d. TFT ST7789
+
+#### 3d-1. Modul 7 pin tanpa CS — 1 layar (terbukti di bench test)
+
+| Pin TFT | ESP32              |
+| ------- | ------------------ |
+| GND     | GND                |
+| VCC     | 3V3 (bukan 5V)     |
+| SCL     | GPIO 18            |
+| SDA     | GPIO 23            |
+| DC      | GPIO 16            |
+| RES     | **GPIO 5**         |
+| BLK     | 3V3 (atau GPIO 19) |
+
+Syarat agar layar merespons: **SPI mode 3** dan **RES dipulsakan dari GPIO**.
+Percobaan dengan RES ke 3V3 (mode 0 dan 3) dan RES GPIO + mode 2 tidak
+menghasilkan tampilan.
+
+#### 3d-2. Modul dengan pin CS — 2 layar (SPI shared)
+
+_Diagram di bawah belum diuji di hardware. Untuk RES, hasil bench test
+menyarankan GPIO daripada 3.3V._
 
 ```text
 ESP32            TFT Locker_01   TFT Locker_02
@@ -198,6 +228,11 @@ GPIO 17        ───┴─────────── -                 D
 **Konsep:** SCLK, MOSI, BLK, VCC, GND, RES **shared** (paralel ke semua
 TFT). CS dan DC **individual per TFT** untuk memilih mana yang aktif.
 
+> **Catatan 2 layar tanpa CS (analisis, belum diuji):** tanpa pin CS, layar
+> tidak bisa dipilih lewat chip select, jadi dua layar yang berbagi SCL/SDA
+> akan menerima data yang sama. Perlu diputuskan: pakai modul yang punya pin
+> CS, atau bus SPI terpisah per layar.
+
 ---
 
 ## 4. Urutan Assembly
@@ -213,7 +248,9 @@ Jangan langsung rakit 2 locker. Bench test 1 set dulu.
 3. **Wiring 1 sensor** + resistor pull-up. Test: tempel magnet, cek
    tegangan GPIO 34 dengan multimeter (harus ~0V saat magnet dekat,
    ~3.3V saat jauh).
-4. **Wiring 1 TFT**. Upload firmware test, harus muncul QR.
+4. **Wiring 1 TFT** (tabel 3d-1). Upload tes mentah (`pio run -e rawtft -t upload`):
+   layar harus berganti merah → hijau → biru → putih. Lalu upload `-e bench`
+   untuk menguji teks dan QR lewat library.
 
 Kalau 4 test di atas lulus, baru lanjut Fase B.
 
@@ -262,10 +299,22 @@ orientasi sensor.
 
 ### Test TFT
 
-1. Upload firmware dengan `ENABLE_TFT true`.
-2. Serial Monitor harus print: `[TFT] Init locker 0 (CS=4, DC=16)`.
-3. Kalau crash/WDT trigger: cek wiring SPI (SCLK, MOSI, CS, DC).
-4. Layar harusnya render QR setelah 10-15 detik.
+**Tahap 1 — tes mentah (tanpa library):**
+
+1. Wiring sesuai tabel 3d-1.
+2. `pio run -e rawtft -t upload`, buka Serial Monitor (115200).
+3. Serial: `[RAW] init selesai (RES pin: 5)`, lalu nama warna.
+4. Layar berganti merah → hijau → biru → putih tiap 1,5 detik.
+   _Status 15 Okt 2026: ✅ berhasil (SPI mode 3, RES GPIO 5)._
+
+**Tahap 2 — library (`pio run -e bench -t upload`):**
+
+1. Serial: `[TFT] Init locker 0 (CS=4, DC=16, RST=5)`.
+2. Layar menampilkan "TFT OK", lalu QR (hitam di latar putih) yang berganti
+   tiap 5 detik. Scan dengan HP: hasilnya `locker_01.tokXXXX`.
+   _Status 15 Okt 2026: tulisan "TFT OK" ✅ tampil; **QR belum tampil**
+   (penyebab belum diketahui)._
+3. Kalau crash/WDT trigger: cek wiring SPI (SCLK, MOSI, DC, RES).
 
 ---
 
@@ -295,17 +344,19 @@ orientasi sensor.
 
 ## 7. Troubleshooting
 
-| Gejala                               | Kemungkinan                               | Solusi                    |
-| ------------------------------------ | ----------------------------------------- | ------------------------- |
-| Relay tidak klik saat GPIO LOW       | Wiring IN salah, VCC relay tidak nyambung | Cek VCC=5V, GND common    |
-| Solenoid bunyi lemah                 | Arus adaptor kurang                       | Ganti adaptor ≥2A         |
-| Relay klik tapi solenoid tidak gerak | Flyback diode terbalik                    | Cek orientasi diode       |
-| Sensor selalu baca LOW               | Resistor pull-up tidak terpasang          | Pasang 10kΩ ke 3.3V       |
-| Sensor selalu baca HIGH              | Kabel sensor putus                        | Cek kontinuitas           |
-| TFT blank putih                      | Wiring SPI salah                          | Cek SCLK=18, MOSI=23      |
-| TFT crash firmware                   | TFT tidak respons                         | Cek VCC=3.3V, RES=3.3V    |
-| ESP32 reset terus                    | Brownout (arus kurang)                    | Cek buck output ≥2A       |
-| WiFi tidak connect                   | ESP32 tidak dapat IP                      | Cek kabel antena di board |
+| Gejala                               | Kemungkinan                               | Solusi                                              |
+| ------------------------------------ | ----------------------------------------- | --------------------------------------------------- |
+| Relay tidak klik saat GPIO LOW       | Wiring IN salah, VCC relay tidak nyambung | Cek VCC=5V, GND common                              |
+| Solenoid bunyi lemah                 | Arus adaptor kurang                       | Ganti adaptor ≥2A                                   |
+| Relay klik tapi solenoid tidak gerak | Flyback diode terbalik                    | Cek orientasi diode                                 |
+| Sensor selalu baca LOW               | Resistor pull-up tidak terpasang          | Pasang 10kΩ ke 3.3V                                 |
+| Sensor selalu baca HIGH              | Kabel sensor putus                        | Cek kontinuitas                                     |
+| TFT blank putih                      | Wiring SPI salah                          | Cek SCLK=18, MOSI=23                                |
+| TFT crash firmware                   | TFT tidak respons                         | Cek VCC=3.3V, RES (GPIO 5 untuk modul tanpa CS)     |
+| TFT backlight nyala, layar gelap     | Modul tanpa CS: SPI mode / reset salah    | SPI mode 3 + RES ke GPIO 5                          |
+| Build gagal `pins_arduino.h` hilang  | Paket framework Arduino-ESP32 rusak       | Hapus & unduh ulang paket di `.platformio\packages` |
+| ESP32 reset terus                    | Brownout (arus kurang)                    | Cek buck output ≥2A                                 |
+| WiFi tidak connect                   | ESP32 tidak dapat IP                      | Cek kabel antena di board                           |
 
 ---
 
@@ -350,8 +401,6 @@ Kalau ada pertanyaan wiring atau firmware behavior:
 - **Backend:** Galuh (device token, endpoint, dsb)
 - **Fisik/casing:** Alfian (lemari, mounting)
 
-````
-
 ---
 
 ## Rekap Perubahan dari Versi 4 Locker
@@ -368,3 +417,17 @@ Kalau ada pertanyaan wiring atau firmware behavior:
 | 9. Checklist       | Semua item 4x → 2x, prioritas adaptor                                   |
 
 ---
+
+## Rekap Perubahan — Update 15 Okt 2026
+
+| Section            | Yang diubah                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------ |
+| Header             | Catatan hasil bench test TFT (7 pin tanpa CS, SPI mode 3, RES GPIO 5)                      |
+| 1. Komponen        | Baris TFT: modul bench test tanpa CS                                                       |
+| 2. Pin mapping     | Tambah TFT RES (GPIO 5), catatan CS hanya untuk modul ber-CS                               |
+| 3c. Sensor         | Catatan limit switch (terminal C + NO), pengujian ditunda                                  |
+| 3d. TFT            | Dipecah: 3d-1 modul tanpa CS (terbukti), 3d-2 modul ber-CS (belum diuji) + catatan 2 layar |
+| 4. Assembly        | Fase A langkah 4: tes mentah lalu bench                                                    |
+| 5. Test TFT        | Tahap 1 (mentah) dan tahap 2 (library) + status                                            |
+| 7. Troubleshooting | Tambah: backlight nyala layar gelap; `pins_arduino.h` hilang; RES                          |
+| Perbaikan format   | Pagar kode ```` rusak di bagian 3a dan akhir dokumen dihapus                               |
