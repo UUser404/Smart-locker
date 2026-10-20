@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"name": "smart-locker",
+			"path": "smart-locker"
+		}
+	],
+	"settings": {}
+}
