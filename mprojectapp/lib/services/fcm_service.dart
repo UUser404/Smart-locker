@@ -7,9 +7,16 @@ const String _kPrefPetugasId = 'petugas_id';
 
 /// Handler ini WAJIB berupa top-level function (bukan method di class),
 /// dipanggil sistem saat notifikasi masuk ketika app di-background/terminated.
+///
+/// `@pragma('vm:entry-point')` WAJIB ada sejak Dart 3.x + Impeller/AOT:
+/// tanpa anotasi ini, tree-shaker membuang function → crash saat FCM
+/// mencoba panggil dari native code:
+/// "To closurize ... from native code, it must be annotated."
+@pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // System tray notif otomatis ditangani FCM kalau payload punya block
   // "notification". Cukup log kalau perlu debug.
+  debugPrint('[FCM background] ${message.messageId}');
 }
 
 class FcmService {

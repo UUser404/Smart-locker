@@ -168,6 +168,7 @@ async function notifyNeedsAttention(lockerId, mode = "initial") {
 // ============================================================
 // Reminder loop — dipanggil scheduler tiap 1 menit.
 // Cari semua locker needs_attention, kirim reminder.
+// Log verbose supaya mudah debug saat reminder tidak jalan.
 // ============================================================
 async function remindNeedsAttention() {
     let snapshot;
@@ -182,13 +183,26 @@ async function remindNeedsAttention() {
     }
 
     const lockers = snapshot.docs.map((d) => d.id);
+    console.log(
+        `[fcm reminder] query found ${lockers.length} locker(s): ${lockers.join(", ") || "-"}`
+    );
+
+    if (lockers.length === 0) return 0;
+
     let sent = 0;
     for (const lockerId of lockers) {
+        // Cek throttle sebelum panggil notifyNeedsAttention
+        const last = lastNotifiedAt[lockerId] || 0;
+        const sisaMs = REMINDER_INTERVAL_MS - (Date.now() - last);
+        if (sisaMs > 0) {
+            console.log(
+                `[fcm reminder] ${lockerId}: skip throttle (${Math.ceil(sisaMs / 1000)}s)`
+            );
+            continue;
+        }
+
         await notifyNeedsAttention(lockerId, "reminder");
         sent++;
-    }
-    if (sent > 0) {
-        console.log(`[fcm reminder] diproses ${sent} locker needs_attention`);
     }
     return sent;
 }
@@ -271,14 +285,19 @@ async function catchUpForDevice(fcmToken) {
         return 0;
     }
 
-    if (snapshot.empty) return 0;
+    if (snapshot.empty) {
+        console.log("[fcm catchup] tidak ada locker needs_attention");
+        return 0;
+    }
 
     let sent = 0;
     for (const doc of snapshot.docs) {
         const ok = await sendCatchUpToToken(fcmToken, doc.id);
         if (ok) sent++;
     }
-    console.log(`[fcm catchup] ${sent} notif terkirim ke token ${fcmToken.slice(0, 12)}...`);
+    console.log(
+        `[fcm catchup] ${sent} notif terkirim ke token ${fcmToken.slice(0, 12)}...`
+    );
     return sent;
 }
 

@@ -12,16 +12,15 @@ const {
 } = require("./services/fcmService");
 
 const ROTATE_INTERVAL_MS = 5 * 1000;    // 5 detik
-const TIMEOUT_INTERVAL_MS = 30 * 1000;  // 30 detik — cek transisi occupied → needs_attention
-const REMINDER_INTERVAL_MS = 60 * 1000; // 60 detik — reminder ke locker needs_attention
+const TIMEOUT_INTERVAL_MS = 30 * 1000;  // 30 detik
+const REMINDER_INTERVAL_MS = 60 * 1000; // 60 detik
 
 function startScheduler() {
     console.log("[scheduler] started");
 
     setInterval(async () => {
         try {
-            const n = await rotateAllTokens(db);
-            // if (n > 0) console.log(`[rotate] ${n} token dirotasi`);
+            await rotateAllTokens(db);
         } catch (err) {
             console.error("[rotate] error:", err.message);
         }
@@ -36,11 +35,14 @@ function startScheduler() {
         }
     }, TIMEOUT_INTERVAL_MS);
 
-    // Reminder: pengingat tiap 1 menit untuk locker yang masih
-    // needs_attention. collapseKey sama → accordion di system tray.
+    // Reminder: log setiap tick (dengan timestamp) supaya kelihatan
+    // scheduler benar-benar jalan di Render, meski tidak ada locker.
     setInterval(async () => {
+        const ts = new Date().toISOString();
         try {
-            await remindNeedsAttention();
+            console.log(`[reminder tick] ${ts}`);
+            const n = await remindNeedsAttention();
+            console.log(`[reminder done] processed=${n}`);
         } catch (err) {
             console.error("[reminder] error:", err.message);
         }
