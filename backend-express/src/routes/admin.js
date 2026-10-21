@@ -1,6 +1,7 @@
 const express = require("express");
 const {
-    resetCooldown
+    resetCooldown,
+    catchUpForDevice,
 } = require("../services/fcmService");
 const {
     db
@@ -136,6 +137,8 @@ router.post("/lockers/:id/resolve", requireAuth, async (req, res) => {
 
 // ============================================================
 // POST /api/admin/register-device — tanpa auth (first-time)
+// Setelah register sukses, kirim catch-up notif untuk locker
+// needs_attention yang mungkin terlewat.
 // ============================================================
 router.post("/register-device", async (req, res) => {
     const {
@@ -157,6 +160,13 @@ router.post("/register-device", async (req, res) => {
             fcmToken: fcm_token,
             petugasId: petugas_id,
             registeredAt: new Date(),
+        });
+
+        // Catch-up: kirim notif untuk locker needs_attention yang
+        // mungkin terlewat selama device offline / logout.
+        // Fire-and-forget — jangan blok response.
+        catchUpForDevice(fcm_token).catch((err) => {
+            console.error("[catchup] error:", err.message);
         });
 
         return res.status(200).json({
@@ -188,10 +198,7 @@ router.post("/unregister-device", requireAuth, async (req, res) => {
     }
 
     try {
-        // JWT valid = otorisasi cukup. Hapus doc berdasarkan token.
-        // Kalau doc tidak ada (mis. sudah terhapus cleanup FCM), tetap OK.
         await db.collection("petugas_devices").doc(fcm_token).delete();
-
         return res.status(200).json({
             status: "ok"
         });

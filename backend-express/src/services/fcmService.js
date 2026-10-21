@@ -6,27 +6,61 @@ const {
 } = require("../firebase");
 
 // ============================================================
-// Anti alarm fatigue
+// State in-memory
 // ============================================================
-// Simpan timestamp notif terakhir per locker (in-memory)
+// Simpan timestamp notif terakhir per locker — dipakai untuk
+// throttle reminder (jangan kirim ulang < 60 detik)
 const lastNotifiedAt = {};
-const NOTIF_COOLDOWN_MS = 10 * 60 * 1000; // 10 menit jeda
+const REMINDER_INTERVAL_MS = 60 * 1000; // 1 menit
 
 // ============================================================
-// Kirim notifikasi ke semua device petugas terdaftar
+// Helper: ambil durasi terbuka (menit) dari Firestore
 // ============================================================
-async function notifyNeedsAttention(lockerId) {
-    // 1. Cek jeda — kalau baru kirim < 10 menit, skip
+function computeElapsedMinutes(lockerData) {
+    if (!lockerData || !lockerData.needsAttentionSince) return 0;
+    const elapsedMs = Date.now() - lockerData.needsAttentionSince.toMillis();
+    return Math.floor(elapsedMs / 60000);
+}
+
+// ============================================================
+// Helper: cek locker masih needs_attention?
+// ============================================================
+async function isStillNeedsAttention(lockerId) {
+    const doc = await db.collection("lockers").doc(lockerId).get();
+    if (!doc.exists) return null;
+    const data = doc.data();
+    if (data.status !== "needs_attention") return null;
+    return data;
+}
+
+// ============================================================
+// Kirim notifikasi ke semua device petugas
+// mode: "initial" | "reminder"
+//  - initial : notif pertama saat locker baru jadi needs_attention,
+//              pakai channel high priority + sound + vibrate
+//  - reminder: pengingat tiap 1 menit, channel low priority
+//              (tidak bunyi tiap menit, tapi tetap muncul & update
+//              body). collapseKey sama → accordion di tray.
+// ============================================================
+async function notifyNeedsAttention(lockerId, mode = "initial") {
+    // 1. Cek locker masih needs_attention? Kalau tidak, skip.
+    const lockerData = await isStillNeedsAttention(lockerId);
+    if (!lockerData) {
+        console.log(`[fcm] ${lockerId}: skip (status bukan needs_attention)`);
+        return;
+    }
+
+    // 2. Throttle reminder — jangan kirim ulang < 60 detik
     const now = Date.now();
     const last = lastNotifiedAt[lockerId] || 0;
-    if (now - last < NOTIF_COOLDOWN_MS) {
-        const sisaDetik = Math.floor((NOTIF_COOLDOWN_MS - (now - last)) / 1000);
-        console.log(`[fcm] ${lockerId}: skip (cooldown, ${sisaDetik}s lagi)`);
+    if (now - last < REMINDER_INTERVAL_MS) {
+        const sisaDetik = Math.floor((REMINDER_INTERVAL_MS - (now - last)) / 1000);
+        console.log(`[fcm] ${lockerId}: skip (throttle, ${sisaDetik}s lagi)`);
         return;
     }
 
     try {
-        // 2. Ambil semua FCM token petugas
+        // 3. Ambil semua FCM token petugas
         const snapshot = await db.collection("petugas_devices").get();
         const tokens = [];
         snapshot.forEach((doc) => {
@@ -39,64 +73,63 @@ async function notifyNeedsAttention(lockerId) {
             return;
         }
 
-        // 3. Hitung durasi terbuka untuk body notif
-        const lockerDoc = await db.collection("lockers").doc(lockerId).get();
-        let durasiText = "baru saja";
-        if (lockerDoc.exists) {
-            const data = lockerDoc.data();
-            if (data.needsAttentionSince) {
-                const elapsedMs = Date.now() - data.needsAttentionSince.toMillis();
-                const elapsedMin = Math.floor(elapsedMs / 60000);
-                durasiText = `${elapsedMin} menit lalu`;
-            }
-        }
+        // 4. Body notif adaptif
+        const elapsedMin = computeElapsedMinutes(lockerData);
+        const isReminder = mode === "reminder";
+        const title = isReminder
+            ? "⚠️ Masih Perlu Perhatian"
+            : "⚠️ Locker Perlu Perhatian";
+        const body = isReminder
+            ? `Locker ${lockerId.toUpperCase()} — masih terbuka, ${elapsedMin} menit. Segera cek.`
+            : `Locker ${lockerId.toUpperCase()} — pintu terbuka sejak ${elapsedMin} menit lalu. Segera cek.`;
 
-        // 4. Kirim via FCM
+        // 5. Kirim via FCM
         const messaging = getMessaging();
+        const channelId = isReminder
+            ? "smart_locker_reminder"  // low importance, silent
+            : "smart_locker_alert";    // high importance, sound
+
         const response = await messaging.sendEachForMulticast({
             tokens,
-            // Notification message — tampil otomatis walau app tertutup
-            notification: {
-                title: "⚠️ Locker Perlu Perhatian",
-                body: `Locker ${lockerId.toUpperCase()} — pintu terbuka sejak ${durasiText}. Segera cek.`,
-            },
-            // Data message — untuk deep-link ke detail locker
+            notification: { title, body },
             data: {
                 type: "needs_attention",
                 locker_id: lockerId,
+                mode,
                 click_action: "FLUTTER_NOTIFICATION_CLICK",
             },
-            // Anti alarm fatigue
             android: {
-                priority: "high",
-                collapseKey: `locker_${lockerId}`,
-                ttl: 30 * 60 * 1000, // 30 menit
+                priority: isReminder ? "normal" : "high",
+                collapseKey: `locker_${lockerId}`, // accordion: 1 locker = 1 slot
+                ttl: 60 * 60 * 1000, // 1 jam
                 notification: {
-                    channelId: "smart_locker_alert",
-                    priority: "high",
-                    defaultSound: true,
-                    defaultVibrateTimings: true,
+                    channelId,
+                    priority: isReminder ? "default" : "high",
+                    // Reminder: no sound/vibrate, tapi tetap update body
+                    defaultSound: !isReminder,
+                    defaultVibrateTimings: !isReminder,
+                    // Biar reminder tidak bunyi ulang kalau masih di tray
+                    // (accordion: body update, tapi tidak re-alert)
+                    ...(isReminder ? { setOnlyAlertOnce: true } : {}),
                 },
             },
             apns: {
                 headers: {
-                    "apns-priority": "10",
+                    "apns-priority": isReminder ? "5" : "10",
+                    // collapse-id sama → notif baru replace notif lama
                     "apns-collapse-id": `locker_${lockerId}`,
                 },
                 payload: {
                     aps: {
-                        sound: "default",
+                        sound: isReminder ? undefined : "default",
                         badge: 1,
+                        "interruption-level": isReminder ? "passive" : "active",
                     },
                 },
             },
         });
 
-        // 5. Cleanup token yang sudah tidak valid.
-        // Menangkap kasus: device uninstall, logout paksa, token dihapus
-        // via deleteToken() (mis. unregister backend gagal karena JWT
-        // expired). Ini yang bikin token yatim di petugas_devices hilang
-        // otomatis pada notif berikutnya.
+        // 6. Cleanup token invalid
         const invalidTokens = [];
         response.responses.forEach((resp, idx) => {
             if (!resp.success) {
@@ -122,10 +155,10 @@ async function notifyNeedsAttention(lockerId) {
         }
 
         console.log(
-            `[fcm] ${lockerId}: sent=${response.successCount}, failed=${response.failureCount}`
+            `[fcm] ${lockerId} (${mode}): sent=${response.successCount}, failed=${response.failureCount}`
         );
 
-        // 6. Update timestamp setelah kirim
+        // 7. Update timestamp
         lastNotifiedAt[lockerId] = now;
     } catch (err) {
         console.error("[fcm] error:", err.message);
@@ -133,15 +166,133 @@ async function notifyNeedsAttention(lockerId) {
 }
 
 // ============================================================
-// Reset cooldown saat locker di-resolve
-// (dipanggil dari endpoint /admin/lockers/:id/resolve)
+// Reminder loop — dipanggil scheduler tiap 1 menit.
+// Cari semua locker needs_attention, kirim reminder.
+// ============================================================
+async function remindNeedsAttention() {
+    let snapshot;
+    try {
+        snapshot = await db
+            .collection("lockers")
+            .where("status", "==", "needs_attention")
+            .get();
+    } catch (err) {
+        console.error("[fcm reminder] error query:", err.message);
+        return 0;
+    }
+
+    const lockers = snapshot.docs.map((d) => d.id);
+    let sent = 0;
+    for (const lockerId of lockers) {
+        await notifyNeedsAttention(lockerId, "reminder");
+        sent++;
+    }
+    if (sent > 0) {
+        console.log(`[fcm reminder] diproses ${sent} locker needs_attention`);
+    }
+    return sent;
+}
+
+// ============================================================
+// Catch-up: kirim notif ke device tertentu saja (saat login).
+// Device yang baru login dapat notif untuk locker needs_attention
+// yang belum dia lihat.
+// ============================================================
+async function sendCatchUpToToken(token, lockerId) {
+    const lockerData = await isStillNeedsAttention(lockerId);
+    if (!lockerData) return false;
+
+    const elapsedMin = computeElapsedMinutes(lockerData);
+    const messaging = getMessaging();
+
+    try {
+        await messaging.send({
+            token,
+            notification: {
+                title: "⚠️ Locker Perlu Perhatian",
+                body: `Locker ${lockerId.toUpperCase()} — pintu terbuka sejak ${elapsedMin} menit lalu. Segera cek.`,
+            },
+            data: {
+                type: "needs_attention",
+                locker_id: lockerId,
+                mode: "catchup",
+                click_action: "FLUTTER_NOTIFICATION_CLICK",
+            },
+            android: {
+                priority: "high",
+                collapseKey: `locker_${lockerId}`,
+                ttl: 60 * 60 * 1000,
+                notification: {
+                    channelId: "smart_locker_alert",
+                    priority: "high",
+                    defaultSound: true,
+                    defaultVibrateTimings: true,
+                },
+            },
+            apns: {
+                headers: {
+                    "apns-priority": "10",
+                    "apns-collapse-id": `locker_${lockerId}`,
+                },
+                payload: {
+                    aps: { sound: "default", badge: 1 },
+                },
+            },
+        });
+        return true;
+    } catch (err) {
+        const code = err.code;
+        if (
+            code === "messaging/registration-token-not-registered" ||
+            code === "messaging/invalid-registration-token"
+        ) {
+            // Token invalid — hapus dari Firestore
+            try {
+                await db.collection("petugas_devices").doc(token).delete();
+            } catch (_) {}
+        }
+        return false;
+    }
+}
+
+// ============================================================
+// Catch-up untuk 1 device: kirim notif semua locker
+// needs_attention ke token device yang baru login.
+// ============================================================
+async function catchUpForDevice(fcmToken) {
+    let snapshot;
+    try {
+        snapshot = await db
+            .collection("lockers")
+            .where("status", "==", "needs_attention")
+            .get();
+    } catch (err) {
+        console.error("[fcm catchup] error query:", err.message);
+        return 0;
+    }
+
+    if (snapshot.empty) return 0;
+
+    let sent = 0;
+    for (const doc of snapshot.docs) {
+        const ok = await sendCatchUpToToken(fcmToken, doc.id);
+        if (ok) sent++;
+    }
+    console.log(`[fcm catchup] ${sent} notif terkirim ke token ${fcmToken.slice(0, 12)}...`);
+    return sent;
+}
+
+// ============================================================
+// Reset state saat locker di-resolve
 // ============================================================
 function resetCooldown(lockerId) {
     delete lastNotifiedAt[lockerId];
-    console.log(`[fcm] ${lockerId}: cooldown di-reset`);
+    console.log(`[fcm] ${lockerId}: state notif di-reset`);
 }
 
 module.exports = {
     notifyNeedsAttention,
-    resetCooldown
+    remindNeedsAttention,
+    catchUpForDevice,
+    resetCooldown,
 };

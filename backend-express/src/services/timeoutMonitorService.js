@@ -52,7 +52,8 @@ async function checkTimeouts(db) {
         await batch.commit();
         for (const lockerId of triggered) {
             console.log(`[timeout] ${lockerId} → needs_attention`);
-            await notifyNeedsAttention(lockerId);
+            // mode initial: notif pertama dengan sound + vibrate
+            await notifyNeedsAttention(lockerId, "initial");
         }
     }
 

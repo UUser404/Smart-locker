@@ -36,11 +36,18 @@ class _DashboardScreenState extends State<DashboardScreen>
   StreamSubscription? _openedAppSub;
   DateTime? _lastFetch;
 
+  // Anti spam snackbar: track locker yang sudah di-snackbar pada sesi ini.
+  // Reset saat locker keluar dari needs_attention.
+  final Set<String> _snackbarShownFor = {};
+
+  // Untuk accordion in-app: SnackBarController per locker
+  final Map<String, ScaffoldFeatureController<SnackBar, SnackBarClosedReason>>
+  _activeSnackbars = {};
+
   @override
   void initState() {
     super.initState();
 
-    // ⬇️ Register lifecycle observer (untuk auto-refresh saat resume)
     WidgetsBinding.instance.addObserver(this);
 
     _api = ApiService();
@@ -49,37 +56,32 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     _loadLockers();
 
-    // Polling 10 detik
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       _loadLockers(silent: true);
     });
 
-    // FCM foreground
+    // FCM foreground → snackbar accordion
     _fgMessageSub = widget.fcmService.onForegroundMessage.listen((message) {
       final lockerId = message.data['locker_id'];
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
+      final mode = message.data['mode'] ?? 'initial';
+      if (mounted && lockerId != null) {
+        _showLockerSnackBar(
+          lockerId: lockerId as String,
+          body:
               message.notification?.body ?? 'Locker $lockerId perlu perhatian',
-            ),
-          ),
+          isReminder: mode == 'reminder',
         );
       }
       _loadLockers(silent: true);
     });
 
-    // FCM background → tap notif
     _openedAppSub = widget.fcmService.onMessageOpenedApp.listen((_) {
       _loadLockers(silent: true);
     });
 
-    // ⬇️ FCM terminated → app dibuka dari notif setelah kill
     _checkInitialMessage();
   }
 
-  /// Cek apakah app dibuka dari notifikasi (setelah kill total).
-  /// Kalau ya, langsung refresh.
   Future<void> _checkInitialMessage() async {
     try {
       final initial = await FirebaseMessaging.instance.getInitialMessage();
@@ -101,12 +103,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.dispose();
   }
 
-  /// Auto-refresh saat app kembali ke foreground
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       final now = DateTime.now();
-      // Throttle 30 detik biar tidak spam
       if (_lastFetch == null || now.difference(_lastFetch!).inSeconds > 30) {
         debugPrint('[Dashboard] App resumed → refresh');
         _loadLockers(silent: true);
@@ -131,6 +131,10 @@ class _DashboardScreenState extends State<DashboardScreen>
         _error = null;
         _lastFetch = DateTime.now();
       });
+
+      // Catch-up in-app: tampilkan snackbar untuk locker needs_attention
+      // yang belum pernah di-snackbar pada sesi ini.
+      _checkCatchUpSnackbars();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -140,15 +144,73 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
+  /// Tampilkan snackbar catch-up untuk locker needs_attention yang belum
+  /// di-snackbar. Juga bersihkan tracker untuk locker yang sudah resolved.
+  void _checkCatchUpSnackbars() {
+    final needsAttentionIds = _lockers
+        .where((l) => l.status == LockerStatus.needsAttention)
+        .map((l) => l.lockerId)
+        .toSet();
+
+    // Bersihkan tracker untuk locker yang sudah tidak needs_attention
+    _snackbarShownFor.removeWhere((id) => !needsAttentionIds.contains(id));
+    _activeSnackbars.removeWhere((id, _) => !needsAttentionIds.contains(id));
+
+    // Tampilkan snackbar untuk yang belum ditampilkan
+    for (final locker in _lockers) {
+      if (locker.status != LockerStatus.needsAttention) continue;
+      if (_snackbarShownFor.contains(locker.lockerId)) continue;
+
+      _snackbarShownFor.add(locker.lockerId);
+      _showLockerSnackBar(
+        lockerId: locker.lockerId,
+        body:
+            'Locker ${locker.lockerId} — pintu terbuka sejak '
+            '${locker.needsAttentionSinceLabel}. Segera cek.',
+        isReminder: false,
+      );
+    }
+  }
+
+  /// Tampilkan snackbar accordion: kalau sudah ada snackbar untuk locker
+  /// yang sama, tutup dulu lalu tampilkan versi baru (update body).
+  void _showLockerSnackBar({
+    required String lockerId,
+    required String body,
+    required bool isReminder,
+  }) {
+    if (!mounted) return;
+
+    // Accordion: tutup snackbar lama untuk locker ini (kalau ada)
+    final existing = _activeSnackbars[lockerId];
+    if (existing != null) {
+      existing.close();
+      _activeSnackbars.remove(lockerId);
+    }
+
+    final controller = ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(body),
+        duration: const Duration(seconds: 5),
+        backgroundColor: isReminder
+            ? Colors.deepOrange.shade700
+            : Colors.red.shade700,
+        action: SnackBarAction(
+          label: 'Lihat',
+          textColor: Colors.white,
+          onPressed: () {
+            // Scroll ke atas / refresh — di sini cukup refresh
+            _loadLockers(silent: true);
+          },
+        ),
+      ),
+    );
+    _activeSnackbars[lockerId] = controller;
+  }
+
   Future<void> _logout() async {
-    // Unregister FCM DULU (butuh JWT yang masih valid di ApiService).
-    // Kalau JWT expired / jaringan error, unregister() tetap lanjut
-    // (catch internal) dan token yatim akan dibersihkan backend nanti.
     await widget.fcmService.unregister();
-
-    // Baru hapus session lokal
     await _authService.logout();
-
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
@@ -188,6 +250,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     try {
       await _api.resolveLocker(locker.lockerId);
       if (!mounted) return;
+
+      // Tutup snackbar untuk locker ini (accordion cleanup)
+      _activeSnackbars[locker.lockerId]?.close();
+      _activeSnackbars.remove(locker.lockerId);
+      _snackbarShownFor.remove(locker.lockerId);
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${locker.lockerId} ditandai kosong')),
       );

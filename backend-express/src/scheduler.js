@@ -7,9 +7,13 @@ const {
 const {
     checkTimeouts
 } = require("./services/timeoutMonitorService");
+const {
+    remindNeedsAttention
+} = require("./services/fcmService");
 
-const ROTATE_INTERVAL_MS = 5 * 1000; // 5 detik
-const TIMEOUT_INTERVAL_MS = 30 * 1000; // 30 detik
+const ROTATE_INTERVAL_MS = 5 * 1000;    // 5 detik
+const TIMEOUT_INTERVAL_MS = 30 * 1000;  // 30 detik — cek transisi occupied → needs_attention
+const REMINDER_INTERVAL_MS = 60 * 1000; // 60 detik — reminder ke locker needs_attention
 
 function startScheduler() {
     console.log("[scheduler] started");
@@ -31,6 +35,16 @@ function startScheduler() {
             console.error("[timeout] error:", err.message);
         }
     }, TIMEOUT_INTERVAL_MS);
+
+    // Reminder: pengingat tiap 1 menit untuk locker yang masih
+    // needs_attention. collapseKey sama → accordion di system tray.
+    setInterval(async () => {
+        try {
+            await remindNeedsAttention();
+        } catch (err) {
+            console.error("[reminder] error:", err.message);
+        }
+    }, REMINDER_INTERVAL_MS);
 }
 
 module.exports = {

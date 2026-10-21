@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'models/session.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
@@ -13,9 +14,60 @@ import 'screens/login_screen.dart';
 // Jalankan perintah itu dulu supaya file ini ada sebelum build.
 import 'firebase_options.dart';
 
+/// Bikin notification channel Android.
+/// - smart_locker_alert    : importance HIGH, sound + vibrate (notif awal)
+/// - smart_locker_reminder : importance LOW, silent (reminder 1 menit)
+///
+/// Channel hanya bisa dibuat sekali; kalau sudah ada, Android mengabaikan.
+/// Aman dipanggil tiap startup.
+Future<void> _createNotifChannels() async {
+  final plugin = FlutterLocalNotificationsPlugin();
+
+  // Init plugin (wajib sebelum createChannel di Android)
+  const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+  await plugin.initialize(const InitializationSettings(android: androidInit));
+
+  final androidPlugin = plugin
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >();
+
+  if (androidPlugin == null) return;
+
+  // Channel 1: alert (high priority, sound + vibrate)
+  await androidPlugin.createNotificationChannel(
+    const AndroidNotificationChannel(
+      'smart_locker_alert',
+      'Smart Locker Alert',
+      description: 'Peringatan locker perlu perhatian',
+      importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
+    ),
+  );
+
+  // Channel 2: reminder (low priority, silent)
+  // Notif tetap muncul di tray tapi tidak bunyi/vibrate tiap menit.
+  // Body di-update via collapseKey → accordion.
+  await androidPlugin.createNotificationChannel(
+    const AndroidNotificationChannel(
+      'smart_locker_reminder',
+      'Smart Locker Reminder',
+      description: 'Pengingat berkala locker yang belum ditangani',
+      importance: Importance.low,
+      playSound: false,
+      enableVibration: false,
+      showBadge: true,
+    ),
+  );
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Bikin notification channel (Android). Di iOS/no-op.
+  await _createNotifChannels();
 
   // WAJIB didaftarkan sebelum runApp supaya notifikasi tetap tertangani
   // saat app di-background atau ter-terminate.
@@ -75,6 +127,8 @@ class _StartupGateState extends State<_StartupGate> {
     if (session.role == UserRole.petugas) {
       // Re-register token FCM tiap app dibuka (aman dipanggil berkali-kali),
       // jaga-jaga token berubah sejak sesi terakhir.
+      // Setelah register sukses, backend otomatis kirim catch-up notif
+      // untuk locker needs_attention yang mungkin terlewat.
       await _fcmService.initAndRegister(session.nama);
     }
 
