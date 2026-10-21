@@ -92,11 +92,40 @@ async function notifyNeedsAttention(lockerId) {
             },
         });
 
+        // 5. Cleanup token yang sudah tidak valid.
+        // Menangkap kasus: device uninstall, logout paksa, token dihapus
+        // via deleteToken() (mis. unregister backend gagal karena JWT
+        // expired). Ini yang bikin token yatim di petugas_devices hilang
+        // otomatis pada notif berikutnya.
+        const invalidTokens = [];
+        response.responses.forEach((resp, idx) => {
+            if (!resp.success) {
+                const code = resp.error?.code;
+                if (
+                    code === "messaging/registration-token-not-registered" ||
+                    code === "messaging/invalid-registration-token"
+                ) {
+                    invalidTokens.push(tokens[idx]);
+                }
+            }
+        });
+
+        if (invalidTokens.length > 0) {
+            console.log(
+                `[fcm] membersihkan ${invalidTokens.length} token invalid dari petugas_devices`
+            );
+            const batch = db.batch();
+            invalidTokens.forEach((t) => {
+                batch.delete(db.collection("petugas_devices").doc(t));
+            });
+            await batch.commit();
+        }
+
         console.log(
             `[fcm] ${lockerId}: sent=${response.successCount}, failed=${response.failureCount}`
         );
 
-        // 5. Update timestamp setelah kirim
+        // 6. Update timestamp setelah kirim
         lastNotifiedAt[lockerId] = now;
     } catch (err) {
         console.error("[fcm] error:", err.message);
