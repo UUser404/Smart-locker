@@ -11,7 +11,11 @@ const {
 // Simpan timestamp notif terakhir per locker — dipakai untuk
 // throttle reminder (jangan kirim ulang < 60 detik)
 const lastNotifiedAt = {};
-const REMINDER_INTERVAL_MS = 60 * 1000; // 1 menit
+const REMINDER_INTERVAL_MS = 60 * 1000; // 1 menit (interval scheduler)
+// Throttle SENGAJA lebih kecil dari interval scheduler. Kalau sama (60s),
+// jitter latency Firestore membuat selisih waktu jadi 59.9s → di-skip →
+// reminder baru terkirim di tick berikutnya (efektifnya tiap 2 menit).
+const REMINDER_THROTTLE_MS = 50 * 1000;
 
 // ============================================================
 // Helper: ambil durasi terbuka (menit) dari Firestore
@@ -53,8 +57,8 @@ async function notifyNeedsAttention(lockerId, mode = "initial") {
     // 2. Throttle reminder — jangan kirim ulang < 60 detik
     const now = Date.now();
     const last = lastNotifiedAt[lockerId] || 0;
-    if (now - last < REMINDER_INTERVAL_MS) {
-        const sisaDetik = Math.floor((REMINDER_INTERVAL_MS - (now - last)) / 1000);
+    if (now - last < REMINDER_THROTTLE_MS) {
+        const sisaDetik = Math.floor((REMINDER_THROTTLE_MS - (now - last)) / 1000);
         console.log(`[fcm] ${lockerId}: skip (throttle, ${sisaDetik}s lagi)`);
         return;
     }
@@ -100,17 +104,19 @@ async function notifyNeedsAttention(lockerId, mode = "initial") {
             },
             android: {
                 priority: isReminder ? "normal" : "high",
-                collapseKey: `locker_${lockerId}`, // accordion: 1 locker = 1 slot
+                collapseKey: `locker_${lockerId}`, // collapse pesan yang belum terkirim
                 ttl: 60 * 60 * 1000, // 1 jam
                 notification: {
                     channelId,
+                    // tag = kunci accordion di TRAY: notif dengan tag sama
+                    // menggantikan notif lama (collapseKey saja tidak cukup).
+                    tag: `locker_${lockerId}`,
                     priority: isReminder ? "default" : "high",
-                    // Reminder: no sound/vibrate, tapi tetap update body
+                    // Reminder: no sound/vibrate, tapi tetap update body.
+                    // (Bukan field setOnlyAlertOnce — itu BUKAN field FCM v1
+                    // dan membuat request ditolak INVALID_ARGUMENT.)
                     defaultSound: !isReminder,
                     defaultVibrateTimings: !isReminder,
-                    // Biar reminder tidak bunyi ulang kalau masih di tray
-                    // (accordion: body update, tapi tidak re-alert)
-                    ...(isReminder ? { setOnlyAlertOnce: true } : {}),
                 },
             },
             apns: {
@@ -158,8 +164,11 @@ async function notifyNeedsAttention(lockerId, mode = "initial") {
             `[fcm] ${lockerId} (${mode}): sent=${response.successCount}, failed=${response.failureCount}`
         );
 
-        // 7. Update timestamp
-        lastNotifiedAt[lockerId] = now;
+        // 7. Update timestamp — hanya kalau minimal 1 device berhasil,
+        // supaya kegagalan total dicoba lagi di tick berikutnya.
+        if (response.successCount > 0) {
+            lastNotifiedAt[lockerId] = now;
+        }
     } catch (err) {
         console.error("[fcm] error:", err.message);
     }
@@ -193,7 +202,7 @@ async function remindNeedsAttention() {
     for (const lockerId of lockers) {
         // Cek throttle sebelum panggil notifyNeedsAttention
         const last = lastNotifiedAt[lockerId] || 0;
-        const sisaMs = REMINDER_INTERVAL_MS - (Date.now() - last);
+        const sisaMs = REMINDER_THROTTLE_MS - (Date.now() - last);
         if (sisaMs > 0) {
             console.log(
                 `[fcm reminder] ${lockerId}: skip throttle (${Math.ceil(sisaMs / 1000)}s)`
@@ -238,6 +247,7 @@ async function sendCatchUpToToken(token, lockerId) {
                 ttl: 60 * 60 * 1000,
                 notification: {
                     channelId: "smart_locker_alert",
+                    tag: `locker_${lockerId}`,
                     priority: "high",
                     defaultSound: true,
                     defaultVibrateTimings: true,

@@ -182,11 +182,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (!mounted) return;
 
     // Accordion: tutup snackbar lama untuk locker ini (kalau ada)
-    final existing = _activeSnackbars[lockerId];
-    if (existing != null) {
-      existing.close();
-      _activeSnackbars.remove(lockerId);
-    }
+    _closeLockerSnackBar(lockerId);
 
     final controller = ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -206,6 +202,30 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     );
     _activeSnackbars[lockerId] = controller;
+
+    // Hapus dari tracker begitu snackbar tertutup (duration habis / di-swipe),
+    // supaya tracker hanya berisi snackbar yang masih hidup.
+    controller.closed.then((_) {
+      if (identical(_activeSnackbars[lockerId], controller)) {
+        _activeSnackbars.remove(lockerId);
+      }
+    });
+  }
+
+  /// Tutup snackbar milik satu locker dengan aman.
+  ///
+  /// `ScaffoldFeatureController.close()` melempar `Bad state: No element`
+  /// (assert `_snackBars.first`) kalau snackbar itu sudah hilang sendiri
+  /// karena duration habis — dan duration kita cuma 5 detik, sedangkan
+  /// reminder datang tiap 60 detik.
+  void _closeLockerSnackBar(String lockerId) {
+    final controller = _activeSnackbars.remove(lockerId);
+    if (controller == null) return;
+    try {
+      controller.close();
+    } catch (e) {
+      debugPrint('[Dashboard] close snackbar $lockerId diabaikan: $e');
+    }
   }
 
   Future<void> _logout() async {
@@ -252,8 +272,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       if (!mounted) return;
 
       // Tutup snackbar untuk locker ini (accordion cleanup)
-      _activeSnackbars[locker.lockerId]?.close();
-      _activeSnackbars.remove(locker.lockerId);
+      _closeLockerSnackBar(locker.lockerId);
       _snackbarShownFor.remove(locker.lockerId);
 
       ScaffoldMessenger.of(context).showSnackBar(
