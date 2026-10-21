@@ -172,6 +172,39 @@ router.post("/register-device", async (req, res) => {
 });
 
 // ============================================================
+// POST /api/admin/unregister-device — hapus token saat logout
+// (butuh JWT; dipanggil Flutter sebelum session lokal dihapus)
+// ============================================================
+router.post("/unregister-device", requireAuth, async (req, res) => {
+    const {
+        fcm_token
+    } = req.body;
+
+    if (!fcm_token) {
+        return res.status(400).json({
+            status: "error",
+            message: "fcm_token wajib diisi"
+        });
+    }
+
+    try {
+        // JWT valid = otorisasi cukup. Hapus doc berdasarkan token.
+        // Kalau doc tidak ada (mis. sudah terhapus cleanup FCM), tetap OK.
+        await db.collection("petugas_devices").doc(fcm_token).delete();
+
+        return res.status(200).json({
+            status: "ok"
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({
+            status: "error",
+            message: "SERVER_ERROR"
+        });
+    }
+});
+
+// ============================================================
 // GET /api/admin/reports/rentals — hanya admin
 // ============================================================
 router.get(

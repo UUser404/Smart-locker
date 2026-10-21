@@ -141,7 +141,14 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _logout() async {
+    // Unregister FCM DULU (butuh JWT yang masih valid di ApiService).
+    // Kalau JWT expired / jaringan error, unregister() tetap lanjut
+    // (catch internal) dan token yatim akan dibersihkan backend nanti.
+    await widget.fcmService.unregister();
+
+    // Baru hapus session lokal
     await _authService.logout();
+
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(

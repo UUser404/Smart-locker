@@ -175,4 +175,26 @@ class ApiService {
       );
     }
   }
+
+  /// POST /api/admin/unregister-device  (butuh JWT)
+  /// Dipanggil saat logout — hapus token dari backend.
+  Future<void> unregisterDevice({required String fcmToken}) async {
+    final res = await _client
+        .post(
+          _uri('/admin/unregister-device'),
+          headers: _headers(),
+          body: jsonEncode({'fcm_token': fcmToken}),
+        )
+        .timeout(const Duration(seconds: 30));
+
+    if (res.statusCode == 401) {
+      throw ApiException('Sesi berakhir', statusCode: 401);
+    }
+    if (res.statusCode != 200) {
+      throw ApiException(
+        'Gagal unregister device (${res.statusCode})',
+        statusCode: res.statusCode,
+      );
+    }
+  }
 }

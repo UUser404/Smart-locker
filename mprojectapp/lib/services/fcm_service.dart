@@ -1,4 +1,5 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 
@@ -54,6 +55,37 @@ class FcmService {
         }
       });
     }
+  }
+
+  /// Unregister device saat logout:
+  /// 1. Hapus token dari backend (butuh JWT yang masih valid).
+  /// 2. Invalidasi token FCM lokal supaya device berhenti terima notif.
+  /// 3. Hapus `petugas_id` lokal supaya onTokenRefresh tidak re-register.
+  ///
+  /// Aman dipanggil meski backend gagal (mis. JWT expired) — token yatim
+  /// di Firestore akan dibersihkan otomatis oleh cleanup di fcmService.js
+  /// saat FCM lapor `registration-token-not-registered`.
+  Future<void> unregister() async {
+    // 1. Ambil token & hapus dari backend
+    try {
+      final token = await _messaging.getToken();
+      if (token != null) {
+        await _api.unregisterDevice(fcmToken: token);
+      }
+    } catch (e) {
+      debugPrint('[FCM] unregister backend gagal: $e');
+    }
+
+    // 2. Invalidasi token di FCM
+    try {
+      await _messaging.deleteToken();
+    } catch (e) {
+      debugPrint('[FCM] deleteToken gagal: $e');
+    }
+
+    // 3. Hapus petugas_id lokal
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kPrefPetugasId);
   }
 
   Stream<RemoteMessage> get onForegroundMessage => FirebaseMessaging.onMessage;
