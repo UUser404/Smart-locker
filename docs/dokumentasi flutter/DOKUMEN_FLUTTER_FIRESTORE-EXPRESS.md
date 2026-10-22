@@ -3,7 +3,7 @@
 **Project**: `mprojectapp` — Flutter App untuk Petugas Keamanan & Admin Smart Locker
 **Versi**: 1.0.0+1
 **Status**: ✅ Berjalan dengan arsitektur Express sebagai single source of truth
-**Terakhir Update**: 14 Oktober 2026
+**Terakhir Update**: 21 Oktober 2026
 
 ---
 
@@ -62,12 +62,16 @@ mprojectapp/
 │   ├── screens/
 │   │   ├── login_screen.dart           # Login admin/petugas
 │   │   ├── dashboard_screen.dart       # Dashboard petugas (locker list)
-│   │   ├── admin_home_screen.dart      # Dashboard admin (reports)
+│   │   ├── admin_home_screen.dart      # Container admin (bottom nav 2 tab)
+│   │   ├── admin_analytics_screen.dart # Admin tab 1: statistik
+│   │   ├── admin_history_screen.dart   # Admin tab 2: riwayat + filter
 │   │   └── petugas_id_screen.dart      # (Opsional — input ID petugas)
 │   ├── services/
 │   │   ├── api_service.dart            # HTTP client ke Express + JWT
 │   │   ├── auth_service.dart           # Login/logout + session persistence
-│   │   └── fcm_service.dart            # Firebase Cloud Messaging
+│   │   └── fcm_service.dart            # FCM: register, unregister, stream pesan
+│   ├── utils/
+│   │   └── duration_formatter.dart     # Format durasi adaptif
 │   ├── widgets/
 │   │   └── dashboard_widgets.dart      # ProfileHeader, StatGrid, StatusBadge
 │   └── theme/                          # (Kosong / belum dipakai)
@@ -90,11 +94,14 @@ dependencies:
   shared_preferences: ^2.2.0 # Simpan JWT session
   firebase_core: ^3.0.0 # Firebase init (untuk FCM)
   firebase_messaging: ^15.0.0 # Push notification
+  flutter_local_notifications: ^17.2.0 # Notification channel Android (alert + reminder)
   google_fonts: ^6.2.1 # Typography
   cupertino_icons: ^1.0.8
 ```
 
 ⚠️ **`cloud_firestore` TIDAK ada** — sengaja dihapus karena Flutter tidak akses Firestore langsung.
+
+⚠️ **`flutter_local_notifications` WAJIB** — dipakai untuk membuat notification channel Android (`smart_locker_alert` + `smart_locker_reminder`). Tanpa package ini, reminder 1 menit memakai default channel (high priority) → bunyi tiap menit (spam). Lihat section 6.12.
 
 ---
 
@@ -118,13 +125,14 @@ dependencies:
 
 ### Endpoint yang Dipakai Flutter
 
-| Endpoint                     | Method | Auth           | Fungsi              |
-| ---------------------------- | ------ | -------------- | ------------------- |
-| `/auth/login`                | POST   | ❌             | Login → return JWT  |
-| `/admin/lockers`             | GET    | ✅ JWT         | List semua locker   |
-| `/admin/lockers/:id/resolve` | POST   | ✅ JWT         | Resolve locker      |
-| `/admin/reports/rentals`     | GET    | ✅ JWT (admin) | Laporan + statistik |
-| `/admin/register-device`     | POST   | ❌             | Daftarkan FCM token |
+| Endpoint                     | Method | Auth           | Fungsi                                         |
+| ---------------------------- | ------ | -------------- | ---------------------------------------------- |
+| `/auth/login`                | POST   | ❌             | Login → return JWT                             |
+| `/admin/lockers`             | GET    | ✅ JWT         | List semua locker                              |
+| `/admin/lockers/:id/resolve` | POST   | ✅ JWT         | Resolve locker                                 |
+| `/admin/reports/rentals`     | GET    | ✅ JWT (admin) | Laporan + statistik                            |
+| `/admin/register-device`     | POST   | ❌             | Daftarkan FCM token (+ trigger catch-up notif) |
+| `/admin/unregister-device`   | POST   | ✅ JWT         | Hapus FCM token saat logout                    |
 
 ---
 
@@ -138,8 +146,9 @@ dependencies:
 
 1. `Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)`
 2. Daftarkan `FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler)`
-3. `runApp(SmartLockerStaffApp)`
-4. `_StartupGate` cek `AuthService.getSavedSession()`:
+3. Buat notification channel Android (`FlutterLocalNotificationsPlugin.createNotificationChannel()`) — lihat 6.12
+4. `runApp(SmartLockerStaffApp)`
+5. `_StartupGate` cek `AuthService.getSavedSession()`:
    - Tidak ada session → `LoginScreen`
    - Role petugas → re-register FCM + `DashboardScreen`
    - Role admin → `AdminHomeScreen`
@@ -261,6 +270,7 @@ const String kApiBaseUrl = 'https://smart-locker-backend-a2ck.onrender.com/api';
 | `resolveLocker(lockerId)` | POST `/admin/lockers/:id/resolve` | `String` (new status) |
 | `fetchRentalReports()` | GET `/admin/reports/rentals` | `(RentalStats, List<RentalRecord>)` |
 | `registerDevice(fcmToken, petugasId)` | POST `/admin/register-device` | `void` |
+| `unregisterDevice()` | POST `/admin/unregister-device` | `void` (kirim `fcm_token`, butuh JWT valid) |
 | `setToken(token)` | — | — (set JWT untuk request berikutnya) |
 
 **Fitur:**
@@ -305,6 +315,7 @@ const String kApiBaseUrl = 'https://smart-locker-backend-a2ck.onrender.com/api';
 | Method | Fungsi |
 |--------|--------|
 | `initAndRegister(petugasId)` | Init FCM + minta izin + register token ke Express |
+| `unregister()` | Hapus token dari backend, `deleteToken()` lokal, hapus `petugas_id` dari `SharedPreferences` |
 | `onForegroundMessage` | Stream pesan FCM saat app aktif |
 | `onMessageOpenedApp` | Stream pesan FCM saat user tap notif dari background |
 
@@ -314,9 +325,13 @@ const String kApiBaseUrl = 'https://smart-locker-backend-a2ck.onrender.com/api';
 {
   "title": "Locker Perlu Perhatian",
   "body": "Locker_02 - pintu belum tertutup sejak 2 menit lalu",
-  "data": { "locker_id": "locker_02" }
+  "data": { "locker_id": "locker_02", "mode": "initial" }
 }
 ```
+
+`data.mode` bernilai `initial` (notif awal), `reminder` (pengingat tiap 1 menit), atau `catchup` (catch-up saat login). Detail ada di `docs/API.md` 10.7.
+
+**`unregister()` — dipanggil di `DashboardScreen._logout()` SEBELUM `authService.logout()`.** Urutan penting: unregister butuh JWT yang masih valid di `ApiService._token`. Kalau JWT expired, unregister gagal 401, tapi `deleteToken()` + hapus `petugas_id` tetap jalan → token yatim dibersihkan backend saat FCM melaporkan token invalid.
 
 ---
 
@@ -349,6 +364,10 @@ const String kApiBaseUrl = 'https://smart-locker-backend-a2ck.onrender.com/api';
 - **Polling otomatis setiap 10 detik**
 - Auto-refresh saat terima notif FCM (foreground)
 - Auto-refresh saat tap notif (background)
+- **Catch-up snackbar**: saat `_loadLockers()` selesai, kalau ada locker `needs_attention` yang belum pernah di-snackbar pada sesi ini → tampilkan snackbar. Tracker `_snackbarShownFor` di-reset saat locker resolve.
+- **Snackbar accordion**: `_showLockerSnackBar()` menutup snackbar lama untuk locker yang sama sebelum menampilkan yang baru (body di-update, tidak menumpuk). Map `_activeSnackbars` menyimpan controller per locker dan dibersihkan otomatis lewat `controller.closed`. Penutupan selalu lewat `_closeLockerSnackBar()` (try/catch), bukan `controller.close()` langsung.
+- **FCM foreground**: reminder (`mode: "reminder"`) tampil snackbar oranye; notif awal (`mode: "initial"`) tampil snackbar merah.
+- **Resolve**: menutup snackbar locker yang di-resolve + menghapusnya dari tracker.
 
 **Lifecycle:**
 
@@ -368,7 +387,10 @@ dispose:
 |--------|--------|
 | `_loadLockers({silent})` | Fetch dari Express. `silent=true` tidak tampilkan loading spinner |
 | `_resolveLocker(locker)` | Dialog konfirmasi → POST resolve → refresh |
-| `_logout()` | Clear session → navigate LoginScreen |
+| `_checkCatchUpSnackbars()` | Tampilkan snackbar untuk locker `needs_attention` yang belum di-snackbar pada sesi ini |
+| `_showLockerSnackBar(...)` | Tutup snackbar lama locker yang sama, lalu tampilkan yang baru |
+| `_closeLockerSnackBar(lockerId)` | Tutup snackbar locker dengan aman (try/catch) — snackbar yang sudah hilang sendiri tidak membuat error |
+| `_logout()` | `fcmService.unregister()` → `authService.logout()` → navigate LoginScreen |
 | `_statusColor(status)` | Hijau/oranye/merah/grey |
 | `_statusLabel(status)` | "Kosong"/"Terisi"/"Perlu Perhatian" |
 
@@ -406,6 +428,25 @@ dispose:
 | `StatGrid`      | Grid 2x2 untuk `StatCard`                   |
 | `StatCard`      | Kartu statistik dengan icon + label + value |
 | `StatusBadge`   | Badge kecil berwarna untuk status           |
+
+---
+
+### 6.12 Notification Channel (Android)
+
+Dibuat sekali di `main.dart` via `FlutterLocalNotificationsPlugin.createNotificationChannel()` sebelum `runApp()`. Idempotent — aman dipanggil tiap startup.
+
+| Channel ID              | Importance | Sound | Vibrate | Dipakai untuk                                                           |
+| :---------------------- | :--------- | :---- | :------ | :---------------------------------------------------------------------- |
+| `smart_locker_alert`    | High       | ✅    | ✅      | Notif awal saat locker baru jadi `needs_attention`, catch-up saat login |
+| `smart_locker_reminder` | Low        | ❌    | ❌      | Reminder berkala tiap 1 menit selama locker belum di-resolve            |
+
+**Kenapa 2 channel?**
+
+- Notif awal harus **bunyi + getar** supaya petugas sadar.
+- Reminder 1 menit **tidak boleh bunyi** — kalau bunyi terus, petugas akan mematikan notif atau mengabaikannya (alarm fatigue).
+- Body reminder tetap **ter-update** (durasi bertambah) lewat `android.notification.tag` yang sama → accordion di tray (1 locker = 1 slot notif). Backend yang mengirim `tag`; `collapseKey` saja tidak cukup untuk menggantikan notif di tray.
+
+**Verifikasi di HP**: Settings → Apps → Smart Locker Petugas → Notifications → Channels. Harus muncul 2 channel di atas.
 
 ---
 
@@ -470,25 +511,47 @@ setiap 10 detik:
 ```
 Express detect locker needs_attention
     ↓
-Kirim FCM ke semua token di petugas_devices
+Kirim FCM awal (channel alert, bunyi) ke semua token di petugas_devices
+    ↓
+Selama masih needs_attention: reminder tiap 60 detik
+(channel reminder, silent, tag sama → body ter-update)
     ↓
 HP terima notif
-    ├── App foreground → Snackbar + refresh
+    ├── App foreground → Snackbar accordion (merah = awal, oranye = reminder) + refresh
     ├── App background → tap notif → refresh
     └── App terminated → start app → refresh
+    ↓
+Petugas klik Resolve → reminder berhenti
+```
+
+### 8.4 Alur Login Ulang (Catch-up) & Logout
+
+```
+Login petugas → POST /admin/register-device
+    ↓
+Backend (fire-and-forget): kirim FCM catch-up untuk tiap locker needs_attention
+    ↓
+Dashboard selesai load → _checkCatchUpSnackbars() → snackbar in-app
+(petugas bisa menerima 2x: notif tray + snackbar — disengaja)
+
+Logout → fcmService.unregister() (POST /admin/unregister-device, JWT masih valid)
+    ↓
+authService.logout() → hapus session lokal
 ```
 
 ---
 
 ## 🐛 9. Masalah yang Pernah Dihadapi & Solusinya
 
-| Error                              | Penyebab                                       | Solusi                                                       |
-| ---------------------------------- | ---------------------------------------------- | ------------------------------------------------------------ |
-| `LockerStatus.unknown` not found   | Enum cuma 3 nilai, kode punya 4 case           | Hapus case `unknown`                                         |
-| Gradle `Read timed out`            | Jaringan ke `dl.google.com` lambat             | Turunkan `-Xmx`, naikkan HTTP timeout di `gradle.properties` |
-| Firestore `PERMISSION_DENIED`      | Rules belum publish                            | Publish rules (sementara `allow read: if true`)              |
-| `PlatformException(channel-error)` | Build artifacts lama masih referensi Firestore | **`flutter clean`** ⭐                                       |
-| Login 401 di app                   | Struktur Firestore `petugas/admin` berbeda     | Pastikan pakai `petugas/{username}` flat                     |
+| Error                                                      | Penyebab                                                                                                                                                                                             | Solusi                                                                                                                           |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `LockerStatus.unknown` not found                           | Enum cuma 3 nilai, kode punya 4 case                                                                                                                                                                 | Hapus case `unknown`                                                                                                             |
+| Gradle `Read timed out`                                    | Jaringan ke `dl.google.com` lambat                                                                                                                                                                   | Turunkan `-Xmx`, naikkan HTTP timeout di `gradle.properties`                                                                     |
+| Firestore `PERMISSION_DENIED`                              | Rules belum publish                                                                                                                                                                                  | Publish rules (sementara `allow read: if true`)                                                                                  |
+| `PlatformException(channel-error)`                         | Build artifacts lama masih referensi Firestore                                                                                                                                                       | **`flutter clean`** ⭐                                                                                                           |
+| Login 401 di app                                           | Struktur Firestore `petugas/admin` berbeda                                                                                                                                                           | Pastikan pakai `petugas/{username}` flat                                                                                         |
+| `Gagal resolve: Bad state` (tapi locker tetap jadi Kosong) | `controller.close()` dipanggil pada snackbar yang sudah hilang sendiri (duration 5 detik) → `Bad state: No element` sebelum `_loadLockers()`; juga membuat snackbar reminder foreground tidak tampil | Pakai `_closeLockerSnackBar()` (try/catch) + tracker dibersihkan via `controller.closed`                                         |
+| HP bunyi tiap menit saat reminder                          | Reminder tidak memakai channel silent                                                                                                                                                                | Pastikan `flutter_local_notifications` terpasang & channel `smart_locker_reminder` (Low) terbuat; `flutter clean` lalu run ulang |
 
 ---
 
@@ -504,6 +567,10 @@ HP terima notif
 8. **`no_hp` di reports sudah ter-mask** dari Express — jangan coba un-mask di client.
 9. **Jangan hardcode token** — selalu ambil dari `session.token`.
 10. **Setiap perubahan endpoint**, update `docs/API.md` dulu (kontrak resmi).
+11. **Unregister FCM WAJIB saat logout** — panggil `fcmService.unregister()` SEBELUM `authService.logout()`. Kalau terbalik, JWT sudah tidak valid → unregister 401.
+12. **Reminder pakai channel berbeda** — `smart_locker_alert` (bunyi) untuk notif awal, `smart_locker_reminder` (silent) untuk reminder. Jangan campur — kalau reminder pakai channel alert, HP bunyi tiap menit.
+13. **Snackbar accordion** — tutup snackbar lama untuk locker yang sama lewat `_closeLockerSnackBar(lockerId)` sebelum show baru. **Jangan** panggil `controller.close()` langsung: snackbar hanya tampil 5 detik, dan `close()` pada snackbar yang sudah hilang melempar `Bad state: No element` di mode debug.
+14. **`_snackbarShownFor` reset saat resolve** — kalau tidak, snackbar catch-up tidak muncul lagi setelah locker resolve lalu `needs_attention` lagi pada sesi yang sama.
 
 ---
 
@@ -519,6 +586,7 @@ HP terima notif
 | 6   | Trigger needs_attention di Firestore                          | FCM push masuk ≤ 30 detik                                 |
 | 7   | Logout → login ulang                                          | Session persist, tidak perlu login ulang saat app restart |
 | 8   | Kill app → buka lagi                                          | Auto-login jika session belum expired (7 hari)            |
+| 9   | Reminder, catch-up, unregister, channel (Fase 7)              | Lihat tabel test di `DOKUMENTASI_PROGRESS.md` section 9   |
 
 ---
 
@@ -561,7 +629,7 @@ flutter build appbundle --release
 | ---------------------- | ------------------------------------------ |
 | Kontrak API            | `docs/API.md`                              |
 | Progress backend Galuh | `firmware/DOKUMENTASI_PROGRESS_BACKEND.md` |
-| SKPL                   | `docs/SKPL_Smart_Locker_IoT_final.docx`    |
+| SKPL                   | `docs/SKPL Smart Locker IoT-final.docx`    |
 | DEVELOPMENT_GUIDE      | `docs/DEVELOPMENT_GUIDE.md`                |
 
 | Resource           | URL                                                                      |
@@ -610,6 +678,10 @@ Untuk admin yang butuh tampilan lebih besar dari HP.
 - [x] Resolve locker via Express
 - [x] Reports rentals via Express
 - [x] Register FCM device via Express
+- [ ] Unregister FCM device via Express (saat logout) — kode selesai, belum teruji
+- [ ] Reminder berkala 1 menit (accordion) — kode selesai, masih debugging (belum muncul pada uji 21 Okt)
+- [ ] Catch-up notif saat login — kode selesai, belum teruji
+- [ ] 2 notification channel (alert + reminder) — kode selesai, belum diverifikasi di Settings HP
 - [x] `no_hp` di-mask otomatis di backend
 - [x] Firestore Rules dikunci total
 - [x] Tidak ada akses Firestore dari Flutter

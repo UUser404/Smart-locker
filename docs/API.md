@@ -11,6 +11,8 @@ Base URL backend: `https://<domain-backend>/api` (hosting internet, bukan LAN lo
 > **Update: QR dinamis.** QR di badan locker **tidak lagi statis**. Backend merotasi token per locker secara berkala dan menumpangkannya di response polling firmware (bagian 5), lalu firmware menampilkannya sebagai QR di layar TFT kecil pada locker (lihat `hardware/RAB.xlsx` item 1.12), ganti stiker cetak statis. Halaman web sekarang **membuka kamera & scan QR langsung di dalam web** (bukan lewat kamera bawaan HP membuka link statis). Ini menutup celah sewa jarak jauh — lihat bagian 12.
 >
 > **Update: Firmware Device Auth.** Endpoint firmware (`/poll`, `/report`, `/sync`) memerlukan header `X-Device-Token` — lihat bagian 5.0.
+>
+> **Update: Reminder & Catch-up Notifikasi.** Locker `needs_attention` kini diingatkan tiap 1 menit (silent, accordion), notifikasi catch-up dikirim saat petugas login, dan ada endpoint baru `POST /api/admin/unregister-device` saat logout — lihat bagian 10.5, 10.7, dan 10.8.
 
 ---
 
@@ -387,7 +389,7 @@ Backend menjalankan job berkala yang mengecek: kalau sebuah locker berstatus "se
 }
 ```
 
-Locker dengan status ini **tidak bisa disewa user baru** (lihat bagian 1) sampai petugas menyelesaikannya lewat dashboard (bagian 10). Begitu locker ditandai `needs_attention`, backend juga **mengirim push notification ke semua device petugas yang terdaftar** (via FCM).
+Locker dengan status ini **tidak bisa disewa user baru** (lihat bagian 1) sampai petugas menyelesaikannya lewat dashboard (bagian 10). Begitu locker ditandai `needs_attention`, backend juga **mengirim push notification ke semua device petugas yang terdaftar** (via FCM). Selama locker belum di-resolve, backend mengirim pengingat berkala tiap 1 menit (lihat bagian 10.7).
 
 ---
 
@@ -441,6 +443,7 @@ Endpoint yang diproteksi JWT:
 - `GET /api/admin/lockers`
 - `POST /api/admin/lockers/{locker_id}/resolve`
 - `GET /api/admin/reports/rentals` (khusus role `admin`)
+- `POST /api/admin/unregister-device` (role apa saja)
 
 ### 10.3 Dashboard Status Locker
 
@@ -499,6 +502,16 @@ Dipanggil petugas lewat app setelah mengecek & menutup manual locker yang bersta
 { "status": "ok" }
 ```
 
+**Perilaku catch-up:** setelah register sukses, backend otomatis memicu catch-up notifikasi (fire-and-forget, tidak ditunggu di response):
+
+1. Query semua locker dengan `status = "needs_attention"`.
+2. Untuk tiap locker, kirim FCM ke token yang baru register (channel `smart_locker_alert`, `data.mode = "catchup"`, collapseKey dan tag `locker_{id}`).
+3. Log backend: `[fcm catchup] N notif terkirim ke token xxx...`
+
+**Tujuan:** petugas yang baru login tetap mendapat notifikasi untuk locker bermasalah yang mungkin terlewat selama device offline / logout.
+
+**Konsekuensi:** petugas bisa menerima **2x notifikasi** saat login — (1) via FCM di system tray dari catch-up backend, dan (2) via snackbar in-app dari app Flutter. Ini disengaja sebagai redundansi supaya tidak ada yang terlewat.
+
 ### 10.6 Laporan Sesi Sewa
 
 **`GET /api/admin/reports/rentals`** — butuh JWT, **khusus role `admin`**
@@ -535,15 +548,72 @@ Catatan:
 
 ### 10.7 Push Notification (Backend → App)
 
-Begitu backend menandai sebuah locker `needs_attention` (lihat bagian 9), backend langsung mengirim push notification lewat FCM ke semua token petugas yang terdaftar di `petugas_devices`, dengan payload kira-kira:
+Semua push notification dikirim lewat FCM ke token petugas yang terdaftar di `petugas_devices`, untuk locker berstatus `needs_attention` (lihat bagian 9). Ada tiga pengiriman:
+
+| Jenis      | Kapan                                                  | Channel Android         | Perilaku         |
+| ---------- | ------------------------------------------------------ | ----------------------- | ---------------- |
+| Notif awal | Begitu locker ditandai `needs_attention`               | `smart_locker_alert`    | Bunyi + getar    |
+| Reminder   | Tiap 60 detik selama locker masih `needs_attention`    | `smart_locker_reminder` | Silent           |
+| Catch-up   | Setelah `register-device` sukses (lihat bagian 10.5)   | `smart_locker_alert`    | Bunyi sekali     |
+
+Payload kira-kira (field `data.mode` bernilai `initial` untuk notif awal, `reminder` untuk pengingat, dan `catchup` untuk catch-up saat login):
 
 ```json
 {
   "title": "Locker Perlu Perhatian",
-  "body": "Locker_02 - pintu belum tertutup sejak 2 menit lalu",
-  "data": { "locker_id": "locker_02" }
+  "body": "Locker_02 - pintu belum tertutup sejak 5 menit lalu",
+  "data": { "locker_id": "locker_02", "mode": "reminder" }
 }
 ```
+
+Catatan:
+
+- **Accordion:** setiap pengiriman untuk locker yang sama memakai `android.notification.tag = locker_{id}` — **tag inilah yang membuat notif baru menggantikan notif lama di system tray** (body ter-update, durasi bertambah). `collapseKey = locker_{id}` hanya menggabungkan pesan yang belum terkirim ke device; di iOS dipakai `apns-collapse-id = locker_{id}`. 1 locker = 1 slot notifikasi.
+- **Throttle:** `REMINDER_THROTTLE_MS` = 50 detik per locker, sengaja lebih kecil dari interval scheduler 60 detik supaya jitter latency Firestore tidak membuat reminder ter-skip satu tick (efektif jadi tiap 2 menit). State throttle disimpan di memori, di-reset saat locker di-resolve (`resetCooldown()`), dan timestamp hanya diperbarui kalau minimal 1 device berhasil menerima. Menggantikan cooldown 10 menit pada desain sebelumnya.
+- **Berhenti otomatis:** status locker dicek sebelum tiap pengiriman; kalau sudah bukan `needs_attention` (mis. setelah di-resolve), pengiriman di-skip.
+- **Prioritas:** notif awal dan catch-up memakai prioritas tinggi (`android.priority = "high"`, `apns-priority = 10`); reminder memakai prioritas normal (`"normal"`, `apns-priority = 5`). **TTL:** target desain 30 menit (lihat `docs/DESAIN_NOTIFIKASI.md`), tetapi kode saat ini memakai 1 jam — belum disamakan.
+
+### 10.8 Unregister Device Notifikasi
+
+**`POST /api/admin/unregister-device`** — butuh JWT (role apa saja)
+
+Menghapus FCM token device dari database saat petugas logout. Dipanggil app Flutter **sebelum** session lokal dihapus (butuh JWT yang masih valid).
+
+| Field       | Tipe   | Keterangan                                    |
+| ----------- | ------ | --------------------------------------------- |
+| `fcm_token` | string | Token FCM device yang akan dihapus            |
+
+**Contoh response sukses (200):**
+
+```json
+{ "status": "ok" }
+```
+
+- **Idempotent:** kalau token tidak ada di Firestore, tetap 200.
+- Setelah endpoint ini sukses, device **tidak akan menerima notif** lagi.
+
+**Response gagal:**
+
+| HTTP    | Body                                                    | Kondisi                    |
+| :------ | :------------------------------------------------------ | :------------------------- |
+| **400** | `{"status":"error","message":"fcm_token wajib diisi"}`  | Body tidak ada `fcm_token` |
+| **401** | `{"status":"error","message":"MISSING_TOKEN"}`          | Header Authorization kosong |
+| **401** | `{"status":"error","message":"INVALID_TOKEN"}`          | Token invalid/expired      |
+| **500** | `{"status":"error","message":"SERVER_ERROR"}`           | Error backend              |
+
+**Detail implementasi:**
+
+| Aspek                | Nilai                                                                                              |
+| :------------------- | :------------------------------------------------------------------------------------------------- |
+| **Proteksi**         | `requireAuth` (JWT, role apa saja)                                                                 |
+| **Source data**      | Firestore collection `petugas_devices` (doc ID = `fcm_token`)                                      |
+| **Handler**          | `backend-express/src/routes/admin.js`                                                              |
+| **Konsumen Flutter** | `ApiService.unregisterDevice()` → dipanggil `FcmService.unregister()` saat logout                  |
+
+**Catatan keamanan:**
+
+- JWT valid = otorisasi cukup. Backend **tidak** memverifikasi bahwa token FCM benar-benar milik user yang login — siapa pun yang punya token FCM bisa menghapusnya. Ini sesuai skala prototipe (semua petugas dipercaya).
+- Kalau JWT sudah expired saat logout, unregister gagal 401. App Flutter tetap lanjut `deleteToken()` lokal; token yatim di Firestore dibersihkan otomatis oleh *defensive cleanup* di `fcmService.js` saat FCM melaporkan `registration-token-not-registered` pada notifikasi berikutnya.
 
 ---
 
@@ -611,6 +681,7 @@ Backend menjalankan beberapa job berkala:
 
 - **Rotasi token QR** — tiap 5 detik
 - **Timeout monitor** — tiap 30 detik, cek locker `occupied` yang pintunya belum tertutup > 2 menit
+- **Reminder `needs_attention`** — tiap 60 detik (`REMINDER_INTERVAL_MS`), kirim FCM reminder untuk locker yang masih `needs_attention`, dengan throttle 50 detik per locker (lihat bagian 10.7)
 
 ---
 
@@ -628,6 +699,9 @@ Backend menjalankan beberapa job berkala:
 - [x] Autentikasi petugas/admin pakai **JWT** (expire 7 hari, tanpa refresh). Akun di-seed manual di Firestore, tidak ada endpoint register.
 - [x] Rate limit percobaan kode salah: maksimal 5x per 10 menit, lock 5 menit (HTTP 429)
 - [x] Push notification via FCM saat locker `needs_attention`
+- [x] Reminder berkala tiap 60 detik (accordion, silent) sampai locker di-resolve — menggantikan cooldown 10 menit
+- [x] Catch-up notifikasi saat petugas login (`register-device`) untuk locker `needs_attention` yang terlewat
+- [x] Unregister FCM token saat logout (`POST /api/admin/unregister-device`)
 - [x] Device auth token untuk endpoint firmware (`/poll`, `/report`, `/sync`)
 - [x] Token QR disimpan **in-memory** untuk hemat Firestore quota
 - [x] Endpoint `/sync` sebagai alternatif `/poll` + `/report` (1 request gabungan)

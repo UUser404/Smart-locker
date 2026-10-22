@@ -35,8 +35,9 @@ Firmware ESP32 bertugas:
 Dokumen sumber lengkap (sudah ada sebelumnya, tidak diulang di sini):
 
 - `docs/API.md` — kontrak resmi endpoint
+- `docs/DESAIN_NOTIFIKASI.md` — desain notifikasi (tingkat, jenis peringatan, channel)
 - `docs/DEVELOPMENT_GUIDE.md` — konsep, 5W1H, arsitektur, RAB
-- `docs/SKPL_Smart_Locker_IoT_final.docx` — SKPL resmi
+- `docs/SKPL Smart Locker IoT-final.docx` — SKPL resmi
 - `DOKUMENTASI_PROGRESS.md` — progress app Flutter petugas (sisi Reza)
 - `firmware/smart_locker_firmware_documentation.md` — detail firmware
 - `firmware/HARDWARE_WIRING_GUIDE.md` — panduan wiring untuk tim hardware
@@ -93,19 +94,20 @@ Semua endpoint di bawah ini sudah live di production dan sudah ditest.
 
 ### Batch 3 — Endpoint Admin (App Petugas)
 
-| Endpoint                         | Method | Fungsi                                     | Auth       | Status |
-| -------------------------------- | ------ | ------------------------------------------ | ---------- | ------ |
-| `/api/auth/login`                | POST   | Login petugas/admin                        | -          | ✅     |
-| `/api/admin/lockers`             | GET    | List semua locker + status                 | Bearer JWT | ✅     |
-| `/api/admin/lockers/:id/resolve` | POST   | Resolve locker `needs_attention` → `empty` | Bearer JWT | ✅     |
-| `/api/admin/register-device`     | POST   | Daftarkan FCM token petugas                | -          | ✅     |
+| Endpoint                         | Method | Fungsi                                       | Auth       | Status             |
+| -------------------------------- | ------ | -------------------------------------------- | ---------- | ------------------ |
+| `/api/auth/login`                | POST   | Login petugas/admin                          | -          | ✅                 |
+| `/api/admin/lockers`             | GET    | List semua locker + status                   | Bearer JWT | ✅                 |
+| `/api/admin/lockers/:id/resolve` | POST   | Resolve locker `needs_attention` → `empty`   | Bearer JWT | ✅                 |
+| `/api/admin/register-device`     | POST   | Daftarkan FCM token petugas (+ catch-up)     | -          | ✅                 |
+| `/api/admin/unregister-device`   | POST   | Hapus FCM token petugas saat logout (Fase 7) | Bearer JWT | ⏳ menunggu deploy |
 
 ### Batch 4 — Rate Limiter + FCM
 
 Service baru:
 
 - `rateLimiterService` — batasi 5 percobaan kode salah per locker per 10 menit, lock 5 menit
-- `fcmService` — kirim push notification ke semua device petugas saat locker jadi `needs_attention`
+- `fcmService` — kirim push notification ke semua device petugas saat locker jadi `needs_attention` (notif awal, reminder berkala, dan catch-up — lihat Fase 7)
 
 Diintegrasikan ke endpoint `/api/lockers/:id/access`.
 
@@ -142,24 +144,6 @@ Response field: `stats` (total_rentals, avg_duration_seconds, busiest_locker_id)
 
 **Endpoint baru:** `POST /api/firmware/:controllerId/sync`
 
-### Fase 6 — Anti Alarm Fatigue (FCM Polish)
-
-Mengacu pada materi PBP 6 tentang mencegah alarm fatigue:
-
-- **Jeda (cooldown)**: max 1 notif per locker per 10 menit
-- **Collapse key**: `locker_{lockerId}` — notif baru override notif lama
-- **Time to Live (TTL)**: 30 menit — notif basi tidak dikirim
-- **Prioritas tinggi**: mode hemat daya Android tetap kirim
-- **Isi dinamis**: durasi terbuka dihitung real-time ("pintu terbuka sejak 5 menit lalu")
-- **Channel Android**: `smart_locker_alert` (sound + vibrate)
-- **Cooldown reset**: saat petugas resolve locker, cooldown di-reset supaya masalah baru langsung dinotifikasi
-
-**Test:**
-
-- `sent=3, failed=0` — kirim ke 3 device petugas berhasil
-- `skip (cooldown, 598s lagi)` — panggilan kedua di-skip dalam 10 menit
-- `cooldown di-reset` → `sent=3, failed=0` — reset bekerja
-
 **Request body:**
 
 ```json
@@ -184,6 +168,82 @@ Mengacu pada materi PBP 6 tentang mencegah alarm fatigue:
 - Logic sesi terpusat di backend
 - `/poll` dan `/report` lama tetap berfungsi (backward compatibility)
 
+### Fase 6 — Anti Alarm Fatigue (FCM Polish)
+
+Mengacu pada materi PBP 6 tentang mencegah alarm fatigue:
+
+- ~~**Jeda (cooldown)**: max 1 notif per locker per 10 menit~~ — **digantikan di Fase 7** (throttle reminder 60 detik)
+- **Collapse key**: `locker_{lockerId}` — menggabungkan pesan yang belum terkirim ke device (untuk menggantikan notif di tray dibutuhkan `tag`, lihat Fase 7)
+- **Time to Live (TTL)**: target 30 menit — notif basi tidak dikirim (kode saat ini 1 jam, `ttl = 60*60*1000` — belum disamakan)
+- **Prioritas tinggi**: mode hemat daya Android tetap kirim
+- **Isi dinamis**: durasi terbuka dihitung real-time ("pintu terbuka sejak 5 menit lalu")
+- **Channel Android**: `smart_locker_alert` (sound + vibrate) — dipakai untuk notif awal & catch-up; reminder memakai `smart_locker_reminder` (lihat Fase 7)
+- **Reset state**: saat petugas resolve locker, `resetCooldown()` menghapus timestamp throttle locker itu supaya masalah baru langsung dinotifikasi — tetap dipakai di Fase 7 (yang di-reset sekarang throttle reminder, bukan cooldown 10 menit)
+
+**Test (Fase 6, sebelum cooldown dihapus):**
+
+- `sent=3, failed=0` — kirim ke 3 device petugas berhasil
+- `skip (cooldown, 598s lagi)` — panggilan kedua di-skip dalam 10 menit
+- `cooldown di-reset` → `sent=3, failed=0` — reset bekerja
+
+### Fase 7 — Reminder Berkala, Catch-up & Unregister
+
+**Masalah:**
+
+1. Setelah anti alarm-fatigue (cooldown 10 menit), petugas bisa **lupa** locker yang masih `needs_attention` karena tidak ada pengingat.
+2. Petugas yang baru login (atau device offline) **tidak mendapat notifikasi** untuk locker bermasalah yang terjadi saat dia tidak aktif.
+3. Token FCM petugas yang sudah logout masih tersimpan di `petugas_devices`, sehingga device itu tetap menerima notif.
+
+**Solusi:**
+
+**A. Reminder berkala 1 menit (accordion):**
+
+- Cooldown 10 menit **dihapus**, diganti throttle `REMINDER_THROTTLE_MS` = **50 detik** per locker (sengaja di bawah interval scheduler 60 detik; kalau sama, jitter latency Firestore membuat reminder ter-skip satu tick dan efektif jadi tiap 2 menit).
+- Scheduler baru (`REMINDER_INTERVAL_MS = 60s`) → `remindNeedsAttention()`.
+- Setiap kiriman memakai `collapseKey = locker_{id}` (menggabungkan pesan belum terkirim), `android.notification.tag = locker_{id}` (**kunci accordion di tray**: notif baru menggantikan yang lama — body ter-update, durasi naik) dan `apns-collapse-id = locker_{id}` (iOS). `collapseKey` saja tidak cukup untuk accordion di tray.
+- Reminder memakai channel `smart_locker_reminder` (low importance, silent) → tidak bunyi tiap menit.
+- Berhenti otomatis saat `status != "needs_attention"` (dicek sebelum kirim).
+- Reminder memakai prioritas normal (`android.priority = "normal"`, `apns-priority = 5`); notif awal dan catch-up prioritas high.
+- `data.mode` bernilai `initial`, `reminder`, atau `catchup`.
+- Timestamp throttle (`lastNotifiedAt`) hanya diperbarui kalau minimal 1 device sukses menerima; di-reset saat resolve via `resetCooldown()`.
+
+**B. Catch-up saat login:**
+
+- `POST /admin/register-device` → setelah set doc, panggil `catchUpForDevice(token)` (fire-and-forget).
+- `catchUpForDevice()` query locker `needs_attention`, kirim FCM ke token yang baru register (channel alert, bunyi sekali).
+- Frontend: `DashboardScreen._checkCatchUpSnackbars()` menampilkan snackbar in-app untuk locker `needs_attention` yang belum di-snackbar pada sesi itu.
+
+**C. Unregister saat logout:**
+
+- Endpoint baru `POST /admin/unregister-device` (JWT, role apa saja) menghapus doc `petugas_devices/{fcm_token}`. Idempotent.
+- Kalau JWT expired saat logout, unregister gagal 401; token yatim dibersihkan otomatis oleh _defensive cleanup_ di `fcmService.js` saat FCM melaporkan `registration-token-not-registered`.
+
+**Hasil yang diharapkan:**
+
+- Petugas diingatkan tiap 1 menit (silent) sampai locker di-resolve.
+- Petugas yang baru login langsung tahu ada locker bermasalah.
+- Tidak ada notif menumpuk — accordion 1 slot per locker.
+- Device yang sudah logout tidak menerima notif lagi.
+
+**Log yang diharapkan saat uji** (belum diuji di production):
+
+- `[fcm] locker_01 (initial): sent=3, failed=0` — notif awal bunyi
+- `[fcm] locker_01 (reminder): sent=3, failed=0` — 60 detik kemudian, silent
+- `[fcm catchup] 1 notif terkirim ke token xxx...` — saat login ulang
+- `[fcm] locker_01: skip (status bukan needs_attention)` — setelah resolve
+- `[fcm] tidak ada device terdaftar, skip` — setelah logout lalu trigger
+- `[reminder tick] <ISO time>` dan `[reminder done] processed=N` — tiap 60 detik, tanda scheduler hidup (meski tidak ada locker)
+- `[fcm reminder] query found N locker(s): ...` — hasil query locker `needs_attention`
+- `[fcm] GAGAL (mode) token xxx: <kode> — <pesan>` — alasan kegagalan per token (ditambahkan 21 Okt untuk debugging)
+
+**Temuan uji pertama (21 Okt 2026, status locker diubah manual di Firestore):**
+
+- Notif awal muncul di HP petugas. Reminder tiap 1 menit **belum muncul** — masih di-debug (menunggu log Render).
+- Bug ditemukan dan diperbaiki di `fcmService.js`: throttle 60 detik bentrok dengan interval scheduler 60 detik (jadi 50 detik); `setOnlyAlertOnce` bukan field FCM v1 (dihapus, diduga membuat request ditolak `INVALID_ARGUMENT` — belum terkonfirmasi di log); accordion di tray butuh `tag`, bukan hanya `collapseKey`.
+- Bug di app Flutter: `Gagal resolve: Bad state` — lihat dokumen Flutter section 9.
+
+> **Deploy:** ada route dan service baru → di Render wajib **Clear build cache & deploy** (lihat section 6).
+
 ---
 
 ## 4. Struktur Kode
@@ -200,7 +260,7 @@ backend-express/
 ├── serviceAccountKey.json           # rahasia, tidak di-commit
 └── src/
     ├── firebase.js                  # init Firestore
-    ├── scheduler.js                 # cron rotasi token + timeout monitor
+    ├── scheduler.js                 # cron rotasi token + timeout monitor + reminder needs_attention
     ├── middleware/
     │   ├── authMiddleware.js        # requireAuth, requireRole (JWT admin)
     │   └── deviceAuthMiddleware.js # requireDeviceAuth (device token firmware)
@@ -222,7 +282,7 @@ backend-express/
         ├── authService.js           # hash/verify password + JWT
         ├── rateLimiterService.js    # batasi percobaan kode salah
         ├── reportService.js         # laporan sesi + statistik
-        └── fcmService.js            # kirim push notification
+        └── fcmService.js            # push notification: awal, reminder, catch-up
 ```
 
 ### Detail File Penting (Baru)
@@ -230,6 +290,7 @@ backend-express/
 - `src/services/tokenStoreService.js`: In-memory store untuk token QR per locker. Fungsi: `initLocker`, `setStatus`, `setFrozen`, `rotate`, `rotateAll`, `getLatestToken`, `isTokenValid`, `getAll`. Token valid 60 detik, histori max 15 token.
 - `src/services/tokenStoreInit.js`: Load semua locker dari Firestore saat server start. Kalau Firestore gagal (quota exceeded), fallback ke daftar statis (untuk dev). Retry tiap 60 detik.
 - `src/services/lockerStateStore.js`: In-memory state pintu + solenoid per locker. Dipakai untuk deteksi transisi di endpoint `/sync`.
+- `src/services/fcmService.js`: `notifyNeedsAttention()` (notif awal), `remindNeedsAttention()` (reminder tiap 60 detik, dipanggil scheduler), `catchUpForDevice(token)` (catch-up saat register-device), plus defensive cleanup token yatim (`registration-token-not-registered`).
 - `src/middleware/deviceAuthMiddleware.js`: Cek header `X-Device-Token` di endpoint `/firmware/*`. Cache token di memory 5 menit.
 
 ---
@@ -361,6 +422,10 @@ Histori masalah & solusinya:
 21. TFT: backlight menyala tapi layar gelap — modul ST7789 7 pin **tanpa CS** tidak merespons dengan pengaturan default. Solusi (terbukti di bench test 15 Okt 2026): **SPI mode 3** dan **RES dari GPIO 5** (bukan ke 3V3).
 22. `main.cpp` tidak bisa di-compile — penanda konflik merge (`<<<<<<<`, `>>>>>>>`) tersisa. Solusi: hapus penanda dan gabungkan kedua sisi.
 23. `undefined reference to setup()/loop()` di env tes (`rawtft`/`bench`) — file tes tidak ikut terkompilasi oleh `build_src_filter`. Solusi: pastikan nama file persis dan di `src/`, lalu `pio run -e <env> -t clean` dan build ulang.
+24. Reminder FCM tidak muncul tiap 1 menit — `REMINDER_THROTTLE` 60 detik sama dengan interval scheduler 60 detik; jitter latency Firestore membuat selisih waktu 59,9 detik → di-skip → efektif tiap 2 menit. Solusi: `REMINDER_THROTTLE_MS = 50s`, scheduler tetap 60s.
+25. Request FCM reminder diduga ditolak `INVALID_ARGUMENT` — `android.notification.setOnlyAlertOnce` bukan field FCM v1. Solusi: hapus field itu; sifat silent diatur lewat channel `smart_locker_reminder` (Low). Belum terkonfirmasi di log Render.
+26. Reminder menumpuk di tray (bukan accordion) — `collapseKey` hanya menggabungkan pesan yang belum terkirim. Solusi: tambahkan `android.notification.tag = locker_{id}`.
+27. Reminder tetap belum muncul setelah perbaikan #24–#26 — **masih diinvestigasi**; `fcmService.js` kini mencetak `[fcm] GAGAL (...)` dengan kode error per token. Menunggu log Render.
 
 ---
 
@@ -377,6 +442,8 @@ Histori masalah & solusinya:
 - ☑ Fase 1: in-memory token rotation (fix quota)
 - ☑ Fase 4: device auth token
 - ☑ Fase 5: endpoint `/sync`
+- ☑ Fase 6: anti alarm fatigue (FCM polish)
+- ◐ Fase 7: reminder berkala, catch-up, unregister-device — kode selesai; uji pertama 21 Okt: notif awal muncul, reminder 1 menit belum muncul (sedang debugging)
 - ☑ Semua endpoint di-test di lokal & production
 - ☑ Service account key aman (tidak ke-commit)
 - ☑ `JWT_SECRET` ter-set di Render
@@ -399,9 +466,14 @@ Histori masalah & solusinya:
 - ☑ Notifikasi diterima saat app terbuka
 - ☑ Notifikasi diterima saat app tertutup (via baki notifikasi)
 - ☑ Notifikasi tertahan saat offline, muncul saat online
+- ◐ Unregister saat logout, catch-up snackbar, 2 notification channel (Fase 7) — menunggu deploy backend & uji
 
 ### Belum:
 
+- □ Deploy backend Fase 7 ke Render (Clear build cache & deploy)
+- □ Uji end-to-end reminder + catch-up + unregister (termasuk ROM Android agresif)
+- □ Debug reminder 1 menit — ambil log Render (`[reminder tick]`, `[fcm reminder]`, `[fcm] GAGAL`)
+- □ Samakan TTL FCM: kode 1 jam vs desain 30 menit
 - □ Test end-to-end hardware fisik (butuh relay + solenoid + sensor + TFT dari Alfian)
 - □ Ganti password default `admin`/`petugas1`
 - □ Merge `feature/firmware` ke `main` lewat Pull Request
@@ -452,6 +524,7 @@ Histori masalah & solusinya:
 - ☑ Backend simpan di `petugas_devices`
 - ☑ Backend auto-kirim push saat locker jadi `needs_attention`
 - ☑ Tested: notif sampai saat app terbuka & tertutup
+- ◐ App panggil `POST /api/admin/unregister-device` saat logout (Fase 7) — menunggu deploy & uji
 
 ### 3. Production Hardening
 
@@ -460,14 +533,9 @@ Histori masalah & solusinya:
 - □ Set `BUILD_MODE_PRODUCTION` di firmware
 - □ Audit `JWT_SECRET` (harus random)
 
-### 4. Optional Improvement (untuk demo lanjutan)
+### 4. Anti Alarm Fatigue — Sudah Diimplementasi
 
-Anti alarm fatigue di `fcmService.js`:
-
-- Jeda notif (max 1× per locker per 10 menit)
-- Collapse key per `locker_id`
-- TTL 30 menit
-- Prioritas high untuk `needs_attention`
+Collapse key per `locker_id`, TTL (target 30 menit, kode saat ini 1 jam), dan prioritas high sudah jalan (Fase 6). Cooldown 10 menit sudah diganti reminder berkala 60 detik yang silent (Fase 7). Detail ada di `docs/DESAIN_NOTIFIKASI.md`.
 
 ---
 
@@ -481,6 +549,8 @@ Anti alarm fatigue di `fcmService.js`:
 - Firmware dan backend harus sinkron — kalau ganti endpoint firmware, update `config.h` juga.
 - Skala prototype = 2 locker — semua dokumentasi dan kode harus konsisten dengan angka ini.
 - Env PlatformIO: `esp32dev` (firmware penuh), `bench` (tes TFT dengan library), `rawtft` (tes TFT mentah, SPI mode 3). Detail di `firmware/smart_locker_firmware_documentation.md`.
+- Deploy Fase 7 (route `/unregister-device` + service reminder/catch-up) wajib **Clear build cache & deploy** di Render — kalau tidak, route baru balas 404 HTML.
+- App Flutter butuh `flutter clean && flutter pub get && flutter run` setelah Fase 7 (tambah `flutter_local_notifications`).
 - Pengujian hardware berjalan bertahap: TFT dulu (mentah → library → QR), baru limit switch, lalu relay/solenoid.
 
 ---
@@ -493,7 +563,7 @@ Anti alarm fatigue di `fcmService.js`:
 - **Dashboard Render:** [https://dashboard.render.com](https://dashboard.render.com)
 - **Firebase Console:** [https://console.firebase.google.com/project/smart-locker-project-45bac](https://console.firebase.google.com/project/smart-locker-project-45bac)
 - **Kontrak API:** `docs/API.md`
-- **SKPL:** `docs/SKPL_Smart_Locker_IoT_final.docx`
+- **SKPL:** `docs/SKPL Smart Locker IoT-final.docx`
 - **Firmware docs:** `firmware/smart_locker_firmware_documentation.md`
 - **Wiring guide:** `firmware/HARDWARE_WIRING_GUIDE.md`
 
@@ -526,3 +596,27 @@ Anti alarm fatigue di `fcmService.js`:
 | 8. Belum           | Tambah debug QR TFT, uji limit switch, build penuh, uji relay, `ACTIVE_LOCKERS`, 2 TFT tanpa CS, WDT vs cold start |
 | 10. Hardware       | Catatan modul TFT tanpa CS (SPI mode 3, RES GPIO 5)                                                                |
 | 11. Catatan        | Env PlatformIO + urutan uji hardware                                                                               |
+
+---
+
+## Rekap Perubahan — Update 21 Okt 2026
+
+| Section            | Yang diubah                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------- |
+| 1. Ringkasan       | Tambah referensi `docs/DESAIN_NOTIFIKASI.md`                                                                  |
+| 3. Batch 3 / 4     | Tambah `unregister-device`; catatan catch-up di `register-device`; `fcmService` kini 3 jenis kiriman          |
+| 3. Fase 6          | Dipindah ke bawah Fase 5 (sebelumnya terselip di tengah Fase 5); cooldown 10 menit ditandai digantikan Fase 7 |
+| 3. Fase 7 (baru)   | Reminder berkala 60 detik, catch-up saat login, unregister saat logout                                        |
+| 4. Struktur        | `scheduler.js` + `fcmService.js` diperbarui; tambah detail fungsi `fcmService`                                |
+| 8. Status          | Fase 6 ☑, Fase 7 ◐; tambah item deploy & uji di "Belum"                                                       |
+| 10. FCM / Optional | Tambah unregister; "Optional Improvement" diganti catatan sudah diimplementasi                                |
+| 11. Catatan        | Wajib Clear build cache untuk deploy Fase 7; `flutter clean` untuk app                                        |
+
+## Rekap Perubahan — Update 21 Okt 2026 (lanjutan, setelah uji pertama)
+
+| Section            | Yang diubah                                                                                                             |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| 3. Fase 6          | Cooldown reset diganti penjelasan `resetCooldown()` (masih dipakai); catatan TTL kode 1 jam vs target 30 menit          |
+| 3. Fase 7          | Throttle 50 detik; accordion pakai `tag`; mode `catchup`; prioritas reminder normal; log diagnostik; temuan uji pertama |
+| 7. Troubleshooting | Tambah #24–#27 (throttle, `setOnlyAlertOnce`, `tag`, reminder masih diinvestigasi)                                      |
+| 8. Status          | Fase 7 ◐ (reminder belum muncul); tambah item debug reminder + samakan TTL                                              |
