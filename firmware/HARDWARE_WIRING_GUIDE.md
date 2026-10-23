@@ -15,7 +15,11 @@ hardware. Ikuti urutan dari bench test sampai full assembly.
 > **Update 15 Okt 2026 (hasil bench test TFT):** modul TFT yang dipakai bench
 > test adalah ST7789 **7 pin tanpa pin CS**. Layar baru merespons dengan
 > **SPI mode 3** dan **RES dihubungkan ke GPIO 5** (bukan ke 3V3). Lihat
-> bagian 3d dan Test TFT. Limit switch dan relay/solenoid **belum diuji**.
+> bagian 3d dan Test TFT.
+
+> **Update 22 Okt 2026:** QR tampil di TFT (dummy dan token dari backend,
+> dengan `ACTIVE_LOCKERS 1`). Limit switch lolos bench test + debounce
+> dengan TFT terpasang. Relay/solenoid **belum diuji**.
 
 ---
 
@@ -173,8 +177,15 @@ GND
 
 **Limit switch:** sambungkan ke terminal **C** dan **NO** (bukan NC), dan pastikan
 pintu benar-benar menekan tuasnya saat tertutup. Kalau tersambung ke NC,
-logika terbuka/tertutup terbalik. _Pengujian limit switch di hardware ditunda
-(belum dilakukan)._
+logika terbuka/tertutup terbalik. _Bench test 22 Okt 2026 (`bench_door.cpp`, TFT terpasang): pembacaan dan
+debounce ✅._
+
+> **Wiring aktual bench test (dikonfirmasi 23 Okt 2026):** limit switch berupa
+> **modul 3 pin**: VCC → 3V3, GND → GND, OUT → GPIO 34. Modul sudah punya
+> rangkaian sendiri, jadi resistor 10 kΩ tidak dipakai. Jangan beri VCC 5V
+> (OUT bisa melebihi 3,3 V di pin ESP32). Polaritas (tertekan = LOW = TERTUTUP)
+> perlu dicek di layar `benchdoor`; jika terbalik, perlu flag inversi di firmware.
+> Diagram C/NO + 10 kΩ di atas berlaku untuk limit switch/reed biasa tanpa modul.
 
 **Cara kerja:**
 
@@ -297,6 +308,13 @@ Kalau 4 test di atas lulus, baru lanjut Fase B.
 Kalau selalu 0V atau selalu 3.3V: cek resistor pull-up, cek kabel, cek
 orientasi sensor.
 
+**Tes firmware (`benchdoor`, TFT terpasang):**
+
+1. `ACTIVE_LOCKERS` harus 1. Upload `pio run -e benchdoor -t upload`.
+2. Tekan sekali → satu baris `[DOOR] #N TERTUTUP | tepi mentah=... | bounce=... ms`; lepas → `TERBUKA`.
+3. Tekan-lepas cepat 10× → harus 20 event. Bounce mendekati 50 ms → naikkan `SENSOR_DEBOUNCE_MS`.
+   _Status 22 Okt 2026: ✅ berfungsi._
+
 ### Test TFT
 
 **Tahap 1 — tes mentah (tanpa library):**
@@ -312,8 +330,7 @@ orientasi sensor.
 1. Serial: `[TFT] Init locker 0 (CS=4, DC=16, RST=5)`.
 2. Layar menampilkan "TFT OK", lalu QR (hitam di latar putih) yang berganti
    tiap 5 detik. Scan dengan HP: hasilnya `locker_01.tokXXXX`.
-   _Status 15 Okt 2026: tulisan "TFT OK" ✅ tampil; **QR belum tampil**
-   (penyebab belum diketahui)._
+   _Status 22 Okt 2026: ✅ tulisan "TFT OK" dan QR (hitam di latar putih) tampil._
 3. Kalau crash/WDT trigger: cek wiring SPI (SCLK, MOSI, DC, RES).
 
 ---
@@ -344,19 +361,21 @@ orientasi sensor.
 
 ## 7. Troubleshooting
 
-| Gejala                               | Kemungkinan                               | Solusi                                              |
-| ------------------------------------ | ----------------------------------------- | --------------------------------------------------- |
-| Relay tidak klik saat GPIO LOW       | Wiring IN salah, VCC relay tidak nyambung | Cek VCC=5V, GND common                              |
-| Solenoid bunyi lemah                 | Arus adaptor kurang                       | Ganti adaptor ≥2A                                   |
-| Relay klik tapi solenoid tidak gerak | Flyback diode terbalik                    | Cek orientasi diode                                 |
-| Sensor selalu baca LOW               | Resistor pull-up tidak terpasang          | Pasang 10kΩ ke 3.3V                                 |
-| Sensor selalu baca HIGH              | Kabel sensor putus                        | Cek kontinuitas                                     |
-| TFT blank putih                      | Wiring SPI salah                          | Cek SCLK=18, MOSI=23                                |
-| TFT crash firmware                   | TFT tidak respons                         | Cek VCC=3.3V, RES (GPIO 5 untuk modul tanpa CS)     |
-| TFT backlight nyala, layar gelap     | Modul tanpa CS: SPI mode / reset salah    | SPI mode 3 + RES ke GPIO 5                          |
-| Build gagal `pins_arduino.h` hilang  | Paket framework Arduino-ESP32 rusak       | Hapus & unduh ulang paket di `.platformio\packages` |
-| ESP32 reset terus                    | Brownout (arus kurang)                    | Cek buck output ≥2A                                 |
-| WiFi tidak connect                   | ESP32 tidak dapat IP                      | Cek kabel antena di board                           |
+| Gejala                                    | Kemungkinan                                    | Solusi                                              |
+| ----------------------------------------- | ---------------------------------------------- | --------------------------------------------------- |
+| Relay tidak klik saat GPIO LOW            | Wiring IN salah, VCC relay tidak nyambung      | Cek VCC=5V, GND common                              |
+| Solenoid bunyi lemah                      | Arus adaptor kurang                            | Ganti adaptor ≥2A                                   |
+| Relay klik tapi solenoid tidak gerak      | Flyback diode terbalik                         | Cek orientasi diode                                 |
+| Sensor selalu baca LOW                    | Resistor pull-up tidak terpasang               | Pasang 10kΩ ke 3.3V                                 |
+| Sensor selalu baca HIGH                   | Kabel sensor putus                             | Cek kontinuitas                                     |
+| TFT blank putih                           | Wiring SPI salah                               | Cek SCLK=18, MOSI=23                                |
+| TFT crash firmware                        | TFT tidak respons                              | Cek VCC=3.3V, RES (GPIO 5 untuk modul tanpa CS)     |
+| TFT backlight nyala, layar gelap          | Modul tanpa CS: SPI mode / reset salah         | SPI mode 3 + RES ke GPIO 5                          |
+| QR tidak tampil, Serial bilang "digambar" | `startWrite()`/`endWrite()` di luar `fillRect` | Hapus pembungkus (lihat dokumentasi firmware)       |
+| Layar kosong di firmware penuh            | `ACTIVE_LOCKERS` > jumlah layar terpasang      | Samakan `ACTIVE_LOCKERS` dengan jumlah layar        |
+| Build gagal `pins_arduino.h` hilang       | Paket framework Arduino-ESP32 rusak            | Hapus & unduh ulang paket di `.platformio\packages` |
+| ESP32 reset terus                         | Brownout (arus kurang)                         | Cek buck output ≥2A                                 |
+| WiFi tidak connect                        | ESP32 tidak dapat IP                           | Cek kabel antena di board                           |
 
 ---
 
@@ -431,3 +450,13 @@ Kalau ada pertanyaan wiring atau firmware behavior:
 | 5. Test TFT        | Tahap 1 (mentah) dan tahap 2 (library) + status                                            |
 | 7. Troubleshooting | Tambah: backlight nyala layar gelap; `pins_arduino.h` hilang; RES                          |
 | Perbaikan format   | Pagar kode ```` rusak di bagian 3a dan akhir dokumen dihapus                               |
+
+## Rekap Perubahan — Update 22 Okt 2026
+
+| Section            | Yang diubah                                                                  |
+| ------------------ | ---------------------------------------------------------------------------- |
+| Header             | Status: QR tampil, limit switch lolos bench test                             |
+| 3c. Sensor         | Hasil bench test; wiring aktual: modul 3 pin (VCC/GND/OUT → GPIO 34)         |
+| 5. Test Sensor     | Tambah tes firmware `benchdoor`                                              |
+| 5. Test TFT        | Status QR: tampil                                                            |
+| 7. Troubleshooting | Tambah: QR tidak tampil (`startWrite`), layar kosong karena `ACTIVE_LOCKERS` |

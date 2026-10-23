@@ -24,6 +24,7 @@
         <div class="scan-frame"></div>
       </div>
       <p id="camera-error" class="error-text" hidden></p>
+      <p id="scan-status" class="hint" hidden></p>
 
       <!-- Dev tools: belum ada backend & hardware asli, dipakai untuk demo -->
       <details class="dev-tools">
@@ -114,6 +115,7 @@
       <div class="icon-success">✓</div>
       <h2>Locker Terbuka</h2>
       <p class="hint">Mau apa selanjutnya?</p>
+      <p id="choice-error" class="error-text" hidden></p>
       <div class="choice-buttons">
         <button class="btn-primary" data-action="choice-continue">Buka &amp; Lanjut Sewa</button>
         <button class="btn-secondary" data-action="choice-end">Ambil Barang &amp; Akhiri Sewa</button>
@@ -140,7 +142,14 @@
   </main>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<!-- jsQR: coba file lokal (jsQR.js di folder yang sama) dulu, lalu jsDelivr, lalu unpkg -->
+<script src="jsQR.js"></script>
+<script>
+  window.jsQR || document.write('<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"><\/script>');
+</script>
+<script>
+  window.jsQR || document.write('<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"><\/script>');
+</script>
 <script src="script.js"></script>
 </body>
 </html>

@@ -58,78 +58,167 @@ async function fetchWithTimeout(url, options = {}) {
 // ============================================================
 let videoStream = null;
 let scanLoopHandle = null;
+let scanBusy = false;    // true selama payload divalidasi ke server
+let cameraSession = 0;   // penanda agar startCamera yang tertunda bisa dibatalkan
+
+const kScanIntervalMs = 120;     // ~8 pemindaian/detik sudah cukup untuk QR
+const kScanMaxWidth = 1280;      // frame lebih lebar di-downscale sebelum decode
+const kRescanCooldownMs = 2000;  // jeda agar QR yang sama tidak langsung terbaca ulang
+
+function setScanStatus(msg) {
+  const el = document.getElementById("scan-status");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.hidden = !msg;
+}
+
+function cameraErrorMessage(err) {
+  switch (err && err.name) {
+    case "NotAllowedError":
+    case "SecurityError":
+      return "Izin kamera ditolak. Aktifkan izin kamera di pengaturan browser lalu muat ulang halaman.";
+    case "NotFoundError":
+    case "DevicesNotFoundError":
+      return "Kamera tidak ditemukan di perangkat ini.";
+    case "NotReadableError":
+    case "TrackStartError":
+      return "Kamera sedang dipakai aplikasi lain. Tutup aplikasi itu lalu coba lagi.";
+    default:
+      return "Tidak bisa mengakses kamera. Pastikan izin kamera diaktifkan.";
+  }
+}
 
 async function startCamera() {
   const video = document.getElementById("camera-video");
   const errorEl = document.getElementById("camera-error");
   errorEl.hidden = true;
+  setScanStatus("");
 
-  // HTTPS check (getUserMedia butuh HTTPS atau localhost)
-  if (location.protocol !== "https:" && location.hostname !== "localhost") {
+  stopCamera(); // cegah stream ganda
+  const session = cameraSession;
+  scanBusy = false;
+
+  // Pustaka jsQR dari CDN harus sudah termuat
+  if (typeof jsQR === "undefined") {
     errorEl.textContent =
-      "Kamera butuh koneksi HTTPS. Buka halaman ini lewat HTTPS.";
+      "Pemindai QR gagal dimuat. Cek koneksi internet lalu muat ulang halaman.";
+    errorEl.hidden = false;
+    return;
+  }
+
+  // getUserMedia butuh secure context (HTTPS, localhost, atau 127.0.0.1)
+  if (!window.isSecureContext || !navigator.mediaDevices ||
+      !navigator.mediaDevices.getUserMedia) {
+    errorEl.textContent =
+      "Kamera butuh HTTPS (atau localhost). Buka halaman ini lewat HTTPS.";
     errorEl.hidden = false;
     return;
   }
 
   try {
-    videoStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" },
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+      audio: false,
     });
-    video.srcObject = videoStream;
+    if (session !== cameraSession) {
+      // Kamera sudah dihentikan/diganti selagi menunggu izin
+      stream.getTracks().forEach((t) => t.stop());
+      return;
+    }
+    videoStream = stream;
+    video.srcObject = stream;
     await video.play();
+    if (session !== cameraSession) return;
     scanLoop();
   } catch (err) {
-    errorEl.textContent =
-      "Tidak bisa mengakses kamera. Pastikan izin kamera diaktifkan.";
+    if (session !== cameraSession) return;
+    errorEl.textContent = cameraErrorMessage(err);
     errorEl.hidden = false;
   }
 }
 
 function stopCamera() {
-  if (scanLoopHandle) cancelAnimationFrame(scanLoopHandle);
+  cameraSession++; // batalkan startCamera yang masih menunggu
+  if (scanLoopHandle) clearTimeout(scanLoopHandle);
   scanLoopHandle = null;
   if (videoStream) {
     videoStream.getTracks().forEach((t) => t.stop());
     videoStream = null;
   }
+  const video = document.getElementById("camera-video");
+  if (video) video.srcObject = null;
 }
 
 function scanLoop() {
+  if (scanLoopHandle) return; // sudah berjalan, jangan dobel
   const video = document.getElementById("camera-video");
   const canvas = document.getElementById("camera-canvas");
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
   function tick() {
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height);
-      if (code) {
+    scanLoopHandle = null;
+    if (!videoStream || scanBusy) return; // berhenti; dilanjutkan oleh resumeScanning()
+
+    if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
+      const scale = Math.min(1, kScanMaxWidth / video.videoWidth);
+      const w = Math.round(video.videoWidth * scale);
+      const h = Math.round(video.videoHeight * scale);
+      // Ubah ukuran canvas hanya kalau perlu (mengubahnya mereset canvas)
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      ctx.drawImage(video, 0, 0, w, h);
+      const imageData = ctx.getImageData(0, 0, w, h);
+      // QR di layar locker: modul hitam di latar putih, jadi tidak perlu coba inversi
+      const code = jsQR(imageData.data, w, h, { inversionAttempts: "dontInvert" });
+      if (code && code.data) {
         handleScannedPayload(code.data);
         return;
       }
     }
-    scanLoopHandle = requestAnimationFrame(tick);
+    scanLoopHandle = setTimeout(tick, kScanIntervalMs);
   }
-  scanLoopHandle = requestAnimationFrame(tick);
+  scanLoopHandle = setTimeout(tick, kScanIntervalMs);
+}
+
+// Lanjut memindai setelah jeda singkat (kamera tetap menyala)
+function resumeScanning() {
+  scanBusy = true;
+  setTimeout(() => {
+    if (!videoStream) return; // kamera sudah dihentikan (pindah layar)
+    scanBusy = false;
+    setScanStatus("");
+    scanLoop();
+  }, kRescanCooldownMs);
+}
+
+// Pindah dari scanner ke layar lain: matikan kamera + status
+function leaveScanner(screenId) {
+  stopCamera();
+  setScanStatus("");
+  showScreen(screenId);
 }
 
 // === QR PAYLOAD PARSER ===
 // Format dari firmware: "locker_01.9f3a1c" (dot-separated)
 // Sesuai tft_render.cpp: String(lockerId) + "." + String(token)
 function handleScannedPayload(raw) {
-  stopCamera();
+  document.getElementById("camera-error").hidden = true;
 
-  const parts = raw.trim().split(".");
+  const parts = String(raw).trim().split(".");
   if (parts.length !== 2 || !parts[0] || !parts[1]) {
     showError("QR tidak valid. Pastikan scan QR di layar locker.");
-    startCamera();
+    resumeScanning();
     return;
   }
 
+  scanBusy = true; // hentikan decode; kamera tetap tampil selama server memeriksa
+  setScanStatus("Memeriksa QR…");
   const [lockerId, token] = parts;
   validateAndFetchStatus(lockerId, token);
 }
@@ -154,26 +243,27 @@ async function validateAndFetchStatus(lockerId, token) {
       `${kApiBaseUrl}/lockers/${encodeURIComponent(lockerId)}/status?token=${encodeURIComponent(token)}`
     );
 
-    const data = await res.json();
+    // Respons non-JSON (mis. halaman error dari proxy) tidak boleh membuat crash
+    const data = await res.json().catch(() => ({}));
 
     // Handle error responses
     if (!res.ok) {
       if (data.code === "TOKEN_EXPIRED") {
-        showScreen("screen-expired");
+        leaveScanner("screen-expired");
         return;
       }
       if (data.code === "TOKEN_MISSING") {
         showError("QR tidak valid. Scan ulang.");
-        startCamera();
+        resumeScanning();
         return;
       }
       if (res.status === 404) {
         showError("Locker tidak ditemukan.");
-        startCamera();
+        resumeScanning();
         return;
       }
       showError(data.message || "Gagal memuat status locker.");
-      startCamera();
+      resumeScanning();
       return;
     }
 
@@ -183,18 +273,18 @@ async function validateAndFetchStatus(lockerId, token) {
 
     // Render beda screen tergantung status
     if (data.status === "empty") {
-      showScreen("screen-rent-form");
+      leaveScanner("screen-rent-form");
     } else if (data.status === "occupied") {
-      showScreen("screen-access-code");
+      leaveScanner("screen-access-code");
     } else if (data.status === "needs_attention") {
-      showScreen("screen-needs-attention");
+      leaveScanner("screen-needs-attention");
     } else {
       showError("Status locker tidak dikenali.");
-      startCamera();
+      resumeScanning();
     }
   } catch (err) {
     showError(err.message);
-    startCamera();
+    resumeScanning();
   }
 }
 
@@ -333,6 +423,9 @@ document.getElementById("form-access").addEventListener("submit", async (e) => {
       return;
     }
 
+    // Simpan kode untuk aksi "Akhiri Sewa" berikutnya
+    state.uniqueCode = code;
+
     // Coba restore rental_id dari localStorage (kalau user refresh)
     const saved = loadSession();
     if (saved && saved.lockerId === state.lockerId) {
@@ -360,16 +453,36 @@ document.querySelector('[data-action="choice-continue"]').addEventListener("clic
 });
 
 document.querySelector('[data-action="choice-end"]').addEventListener("click", async () => {
-  // Kirim action "end" ke backend
+  const errorEl = document.getElementById("choice-error");
+  errorEl.hidden = true;
+
+  if (!state.uniqueCode) {
+    errorEl.textContent = "Kode unik tidak tersedia. Scan ulang QR dan masukkan kode lagi.";
+    errorEl.hidden = false;
+    return;
+  }
+
+  // Kirim action "end" ke backend. Jangan tampilkan "Sewa Selesai" kalau gagal,
+  // karena sewa masih berjalan di backend.
   try {
-    await fetchWithTimeout(`${kApiBaseUrl}/lockers/${state.lockerId}/access`, {
+    const res = await fetchWithTimeout(`${kApiBaseUrl}/lockers/${state.lockerId}/access`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: state.uniqueCode || "UNKNOWN", action: "end" }),
+      body: JSON.stringify({ code: state.uniqueCode, action: "end" }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      errorEl.textContent =
+        res.status === 400
+          ? "Kode tidak valid. Scan ulang dan masukkan kode lagi."
+          : data.message || "Gagal mengakhiri sewa.";
+      errorEl.hidden = false;
+      return;
+    }
   } catch (err) {
-    // Kalau gagal, tetap lanjut tampil durasi dari state (user sudah di depan locker)
-    console.warn("Access end gagal:", err.message);
+    errorEl.textContent = err.message;
+    errorEl.hidden = false;
+    return;
   }
 
   // Hitung durasi dari startedAt

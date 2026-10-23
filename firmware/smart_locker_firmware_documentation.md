@@ -2,32 +2,34 @@
 
 Firmware ESP32 untuk sistem Smart Locker IoT. Berkomunikasi dengan backend Express di Render via HTTPS, mengeksekusi perintah unlock, melaporkan state pintu, dan menampilkan QR dinamis di layar TFT.
 
-> **Update terakhir: 15 Oktober 2026** — bench test TFT di hardware asli, plus revisi `main.cpp`, `door_sensor.cpp`, dan `tft_render.cpp`.
+> **Update terakhir: 22 Oktober 2026** — QR tampil di TFT (dummy dan token backend), bench test limit switch + debounce, revisi `main.cpp` / `door_sensor.cpp` / `tft_render.cpp`.
 > Bagian bertanda 🔧 atau ⏳ **belum diuji di hardware**.
 
 ## Status Saat Ini
 
-| Komponen         | Status                         | Keterangan                                                                                                             |
-| ---------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| `wifi_client`    | ✅ Tested                      | Connect + reconnect                                                                                                    |
-| `backend_poller` | ✅ Tested                      | `POST /sync` tiap 2 detik, parse JSON                                                                                  |
-| `event_reporter` | ⚪ Tidak dipakai di alur utama | State pintu dikirim lewat `/sync`. `report_door_event()` (`POST /report`) dipertahankan untuk kompatibilitas           |
-| `lock_control`   | 🔧 Compile OK                  | Belum diuji dengan relay/solenoid fisik                                                                                |
-| `door_sensor`    | 🔧 Direvisi                    | Debounce diganti (lihat bawah). Belum diuji ulang dengan limit switch — pengujian ditunda                              |
-| `tft_render`     | 🔧 Sebagian                    | Layar merespons dan teks tampil di hardware asli. **QR belum tampil** (penyebab belum diketahui)                       |
-| `main.cpp`       | 🔧 Direvisi                    | Auto-lock + latch pintu + redraw QR hanya saat token berubah. Baru env `bench` yang pernah di-build; belum diuji penuh |
+| Komponen         | Status                         | Keterangan                                                                                                                                                |
+| ---------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `wifi_client`    | ✅ Tested                      | Connect + reconnect                                                                                                                                       |
+| `backend_poller` | ✅ Tested                      | `POST /sync` tiap 2 detik, parse JSON                                                                                                                     |
+| `event_reporter` | ⚪ Tidak dipakai di alur utama | State pintu dikirim lewat `/sync`. `report_door_event()` (`POST /report`) dipertahankan untuk kompatibilitas                                              |
+| `lock_control`   | 🔧 Compile OK                  | Belum diuji dengan relay/solenoid fisik                                                                                                                   |
+| `door_sensor`    | ✅ Bench test OK               | Debounce stabil. Bench test limit switch + debounce (`bench_door.cpp`) berhasil dengan TFT terpasang (22 Okt). Belum diuji lewat firmware penuh + backend |
+| `tft_render`     | ✅ QR tampil                   | Teks dan QR tampil di hardware asli (SPI mode 3, RES GPIO 5). Token dari backend juga tampil di firmware penuh (`ACTIVE_LOCKERS 1`)                       |
+| `main.cpp`       | 🔧 Sebagian terverifikasi      | Firmware penuh jalan: WiFi + `/sync` + QR dari backend di TFT (22 Okt). Jalur pintu, auto-lock, dan relay belum terverifikasi                             |
 
 ## Hasil Uji Hardware (15 Okt 2026)
 
-| Tes                                                            | Env        | Hasil                                                                                                                                                                     |
-| -------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Build env `bench`                                              | `bench`    | ✅ Sukses setelah paket framework Arduino-ESP32 diunduh ulang (lihat Troubleshooting)                                                                                     |
-| Tes mentah TFT, tanpa library (`tft_raw_test.cpp`)             | `rawtft`   | ✅ Layar merespons di **SPI mode 3**, RES dipulsakan dari GPIO 5                                                                                                          |
-| Tulisan "TFT OK" lewat library Adafruit (`tft_render_message`) | `bench`    | ✅ Tampil (mode 3 + RES GPIO 5)                                                                                                                                           |
-| QR lewat `tft_render_qr`                                       | `bench`    | ⏳ **Belum tampil.** Penyebab belum diketahui. Belum dicek: baris Serial `[TFT] Locker 0 render QR: ...` dan nilai balik `qrcode_initText`. Lanjut dengan tes mentah dulu |
-| Limit switch                                                   | —          | ⏳ Ditunda                                                                                                                                                                |
-| Relay + solenoid                                               | —          | ⏳ Belum                                                                                                                                                                  |
-| WiFi + `/sync` bersama TFT                                     | `esp32dev` | ⏳ Belum                                                                                                                                                                  |
+| Tes                                                            | Env         | Hasil                                                                                                                                                                                   |
+| -------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build env `bench`                                              | `bench`     | ✅ Sukses setelah paket framework Arduino-ESP32 diunduh ulang (lihat Troubleshooting)                                                                                                   |
+| Tes mentah TFT, tanpa library (`tft_raw_test.cpp`)             | `rawtft`    | ✅ Layar merespons di **SPI mode 3**, RES dipulsakan dari GPIO 5                                                                                                                        |
+| Tulisan "TFT OK" lewat library Adafruit (`tft_render_message`) | `bench`     | ✅ Tampil (mode 3 + RES GPIO 5)                                                                                                                                                         |
+| QR lewat `tft_render_qr` (token dummy)                         | `bench`     | ✅ Tampil setelah `startWrite()`/`endWrite()` di luar loop `fillRect` dihapus (22 Okt)                                                                                                  |
+| Limit switch + debounce, TFT terpasang                         | `benchdoor` | ✅ Terbaca dan debounce berfungsi (22 Okt). Wiring: modul 3 pin (VCC→3V3, GND→GND, OUT→GPIO 34). Polaritas (tertekan = TERTUTUP) perlu dicek                                            |
+| Firmware penuh + TFT, token dari backend                       | `esp32dev`  | ✅ WiFi terhubung, `[Sync] OK`, token backend tampil sebagai QR di layar (22 Okt). Dengan `ACTIVE_LOCKERS 2` dan satu layar terpasang layar kosong; dengan `ACTIVE_LOCKERS 1` QR tampil |
+| Firmware penuh + limit switch → log backend                    | `esp32dev`  | ⏳ Log `[sync]` belum terlihat di Render (log backend hanya muncul saat `door_open` berubah). Sedang diverifikasi                                                                       |
+| Relay + solenoid                                               | —           | ⏳ Belum                                                                                                                                                                                |
+| Relay + solenoid (firmware penuh)                              | —           | ⏳ Belum                                                                                                                                                                                |
 
 ## Konfigurasi TFT (hasil bench test)
 
@@ -61,6 +63,7 @@ Wiring bench (1 layar):
 - `lock_init()` dipanggil paling awal di `setup()` (relay OFF sebelum urusan WiFi).
 - QR di TFT digambar ulang **hanya saat token berubah** (hindari flicker), maksimal 1 layar per siklus sync.
 - Konflik merge git yang sempat tersisa di file ini sudah dibersihkan.
+- Log Serial baru: `[Door] Locker N: TERBUKA/TERTUTUP` saat transisi lolos debounce, dan `[Sync] OK (door0 terkirim=...)` agar bisa dicocokkan dengan log backend.
 
 **`door_sensor.cpp`**
 
@@ -72,6 +75,8 @@ Wiring bench (1 layar):
 
 - SPI mode 3 + RES via `TFT_RST_PIN` (lihat Konfigurasi TFT).
 - Warna QR dibalik menjadi **modul hitam di latar putih** (QR standar, lebih mudah dibaca scanner).
+- QR digambar **tanpa `startWrite()`/`endWrite()` di luar loop `fillRect`**. Dengan pembungkus itu QR tidak tampil (log Serial menyatakan "digambar" tetapi layar hanya menampilkan penanda uji). Mekanisme persisnya dugaan (transaksi SPI bersarang di ESP32); hasilnya terbukti: QR tampil setelah pembungkus dihapus.
+- Flag `TFT_DIAG` (default 1): log detail, dump ASCII QR, dan 4 kotak penanda sudut. Set ke **0** untuk mode normal.
 
 **`platformio.ini`**
 
@@ -81,8 +86,8 @@ Wiring bench (1 layar):
 ## Skala & Konfigurasi
 
 - Skala prototype = **2 locker** (lihat `DOKUMENTASI_PROGRESS_BACKEND.md` dan wiring guide).
-- ⚠️ `config.h` yang terakhir dicek: `BUILD_MODE_DEVELOPMENT` → `ACTIVE_LOCKERS 1`, `ENABLE_TFT false`, `ENABLE_DOOR_SENSOR false`; `BUILD_MODE_PRODUCTION` → `ACTIVE_LOCKERS 4`. Samakan dengan skala 2 locker sebelum integrasi.
-- Untuk menguji TFT lewat firmware penuh: `ENABLE_TFT true`, `ENABLE_DOOR_SENSOR false`, `ACTIVE_LOCKERS 1`.
+- `config.h` terakhir dicek (22 Okt): `BUILD_MODE_DEVELOPMENT` → `ACTIVE_LOCKERS 1`, `ENABLE_TFT false`, `ENABLE_DOOR_SENSOR false`; `BUILD_MODE_PRODUCTION` → `ACTIVE_LOCKERS 2`. **`ACTIVE_LOCKERS` harus sama dengan jumlah layar yang terpasang** (dengan 2 dan satu layar, layar kosong).
+- Untuk menguji TFT lewat firmware penuh: `ENABLE_TFT true`, `ENABLE_DOOR_SENSOR false`, `ACTIVE_LOCKERS 1`. Untuk menambah limit switch: `ENABLE_DOOR_SENSOR true`.
 
 ## Hardware Target
 
@@ -98,6 +103,8 @@ GPIO 34, 35, 36, 39 adalah **input-only** dan tidak punya internal pull-up.
 Setiap sensor magnet / limit switch harus dipasang **resistor pull-up 10kΩ**
 dari pin sensor ke 3.3V. Tanpa resistor ini, pin floating dan pembacaan
 random (flapping).
+
+> Resistor ini berlaku untuk sensor tanpa rangkaian sendiri (limit switch C/NO, reed). **Modul limit switch 3 pin (VCC, GND, OUT)** — yang dipakai di bench test — sudah punya rangkaian sendiri dan tidak memakai resistor ini: VCC → 3V3, GND → GND, OUT → GPIO 34 (jangan beri VCC 5V, agar OUT tidak melebihi 3,3 V di pin ESP32).
 
 Diagram:
 
@@ -133,8 +140,9 @@ src/
 ├── door_sensor.h/.cpp    # baca sensor pintu (debounce)
 ├── event_reporter.h/.cpp # POST /report (tidak dipakai di alur /sync)
 ├── tft_render.h/.cpp     # render QR ke TFT ST7789
-├── bench_test.cpp        # tes TFT dengan library (env bench)
-└── tft_raw_test.cpp      # tes TFT mentah tanpa library (env rawtft)
+├── bench_test.cpp        # tes TFT dengan library, token dummy (env bench)
+├── tft_raw_test.cpp      # tes TFT mentah tanpa library (env rawtft)
+└── bench_door.cpp        # tes limit switch + debounce + TFT (env benchdoor)
 ```
 
 ## Cara Build
@@ -144,6 +152,7 @@ cd firmware/smart-locker
 pio run -e esp32dev -t upload   # firmware penuh
 pio run -e bench -t upload      # tes TFT dengan library (teks + QR)
 pio run -e rawtft -t upload     # tes TFT mentah (SPI mode 3)
+pio run -e benchdoor -t upload  # tes limit switch + debounce (TFT terpasang)
 pio device monitor -b 115200    # Serial Monitor
 ```
 
@@ -161,6 +170,15 @@ pio device monitor -b 115200    # Serial Monitor
 2. Layar menampilkan "TFT OK", lalu QR berganti tiap 5 detik (token uji `tok0001`, dst.).
 3. Status saat ini: tulisan tampil, QR belum.
 
+**Tes limit switch + debounce (`benchdoor`)** — TFT tetap terpasang, `ACTIVE_LOCKERS` harus 1:
+
+1. Limit switch ke GPIO 34 (lihat wiring guide). Upload `-e benchdoor`.
+2. Serial: `raw=1 (terbuka)` saat diam, layar "TERBUKA".
+3. Tekan sekali → tepat satu baris `[DOOR] #N TERTUTUP | tepi mentah=... | bounce=... ms | latensi=... ms`.
+4. Lepas → satu baris `TERBUKA`. Tekan-lepas cepat 10× → harus 20 event.
+5. Jika bounce mendekati atau melebihi `SENSOR_DEBOUNCE_MS` (50), naikkan jadi 80–100.
+   _Status 22 Okt 2026: ✅ terbaca dan debounce berfungsi._
+
 **Tanpa hardware lengkap:**
 
 1. **Koneksi WiFi + sync:** upload, lihat log `[Sync] OK` + `[QR] Locker 0 token: xxxxxx`.
@@ -176,6 +194,9 @@ pio device monitor -b 115200    # Serial Monitor
 | Penanda `<<<<<<<` / `>>>>>>>` di `main.cpp`                          | Konflik merge git belum diselesaikan                              | Hapus penanda, gabungkan kedua sisi                                                                                                          |
 | TFT: backlight menyala, layar gelap                                  | Modul tanpa CS butuh SPI mode 3 + RES dari GPIO                   | `init(240, 240, SPI_MODE3)` dan sambungkan RES ke GPIO 5                                                                                     |
 | ESP32 reboot saat backend tidur                                      | Cold start Render (30–60 dtk) melebihi `WDT_TIMEOUT_SEC` (30 dtk) | Naikkan WDT atau pasang cron anti-sleep                                                                                                      |
+| QR tidak tampil padahal Serial menyatakan "digambar"                 | `startWrite()`/`endWrite()` di luar loop `fillRect`               | Hapus pembungkus; biarkan `fillRect` mengatur transaksinya sendiri                                                                           |
+| Layar kosong di firmware penuh, log Serial normal                    | `ACTIVE_LOCKERS` lebih besar dari jumlah layar terpasang          | Samakan `ACTIVE_LOCKERS` dengan jumlah layar (1 untuk bench)                                                                                 |
+| Tidak ada log `[sync]` di Render                                     | Backend hanya mencatat `[sync]` saat `door_open` berubah          | Cek Serial `[Door]` dan `door0 terkirim`; pastikan `ENABLE_DOOR_SENSOR true`                                                                 |
 
 ## Dependencies
 
@@ -192,6 +213,7 @@ pio device monitor -b 115200    # Serial Monitor
 - **Transition detection:** Backend mendeteksi transisi pintu dari perubahan state antar-sync (lihat `openLatch` untuk kasus buka-tutup cepat)
 - **Watchdog:** `WDT_TIMEOUT_SEC 30`. Request HTTPS saat backend cold start bisa memblokir lebih lama dari itu.
 - **Auto-lock** berjalan tiap iterasi loop, tetapi tidak berjalan saat `backend_sync` sedang memblokir.
+- **Sumber token QR:** di firmware penuh, token berasal dari respons `/sync` (`qr_tokens`), dibangkitkan dan dirotasi **di memori backend** (bukan dari Firestore, bukan dummy). Token dummy (`abc123`, `tok0001`, dst.) hanya ada di `bench_test.cpp` (env `bench`). Cara memverifikasi: pindai QR di layar lalu cocokkan dengan baris Serial `[TFT] Locker N render QR: locker_0X.<token>`; kirim token itu ke `GET /api/lockers/locker_01/status?token=<token>`: valid → 200 `{locker_id, status}`; token palsu atau lebih dari sekitar 60 detik → 400 `TOKEN_EXPIRED`.
 
 ## Endpoint Firmware: /sync
 
@@ -233,11 +255,13 @@ node seedController.js
 - [x] Device auth token (`X-Device-Token`)
 - [x] Watchdog (30 dtk) — brownout protection belum
 - [x] TFT merespons di hardware (SPI mode 3 + RES GPIO 5)
-- [ ] **QR tampil di TFT** (debug: cek `qrcode_initText`, Serial, urutan penggambaran)
-- [ ] Uji limit switch di hardware (ditunda)
-- [ ] Build & uji firmware penuh (`esp32dev`) dengan `main.cpp` revisi
+- [x] QR tampil di TFT (22 Okt) — token dummy dan token backend
+- [x] Uji limit switch + debounce di hardware (bench, 22 Okt)
+- [ ] Uji jalur pintu lewat firmware penuh (`ENABLE_DOOR_SENSOR true`): cocokkan Serial `[Door]` dengan log backend
+- [ ] Cek polaritas modul limit switch di layar `benchdoor` (tertekan harus menampilkan TERTUTUP, raw=0). Jika terbalik, tambahkan flag inversi di firmware
+- [x] Build firmware penuh (`esp32dev`): WiFi + sync + QR di TFT (22 Okt)
 - [ ] Uji relay + solenoid, konfirmasi baut kunci bisa re-latch saat pintu ditutup
-- [ ] Samakan `ACTIVE_LOCKERS` di `config.h` dengan skala 2 locker
+- [x] `ACTIVE_LOCKERS` di `config.h`: development 1, production 2 (22 Okt)
 - [ ] Putuskan solusi 2 TFT tanpa pin CS
 - [ ] Atasi cold start Render vs watchdog (naikkan WDT atau anti-sleep)
 - [ ] Multi-locker scaling test

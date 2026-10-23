@@ -426,6 +426,9 @@ Histori masalah & solusinya:
 25. Request FCM reminder diduga ditolak `INVALID_ARGUMENT` — `android.notification.setOnlyAlertOnce` bukan field FCM v1. Solusi: hapus field itu; sifat silent diatur lewat channel `smart_locker_reminder` (Low). Belum terkonfirmasi di log Render.
 26. Reminder menumpuk di tray (bukan accordion) — `collapseKey` hanya menggabungkan pesan yang belum terkirim. Solusi: tambahkan `android.notification.tag = locker_{id}`.
 27. Reminder tetap belum muncul setelah perbaikan #24–#26 — **masih diinvestigasi**; `fcmService.js` kini mencetak `[fcm] GAGAL (...)` dengan kode error per token. Menunggu log Render.
+28. QR tidak tampil padahal log Serial menyatakan QR "digambar" — `startWrite()`/`endWrite()` di luar loop `fillRect` (dugaan: transaksi SPI bersarang di ESP32). Solusi: hapus pembungkus. QR tampil setelah perubahan (22 Okt).
+29. Layar kosong di firmware penuh meski log normal — `ACTIVE_LOCKERS 2` tetapi hanya satu layar terpasang; init layar kedua kemungkinan mereset RES bersama. Solusi: `ACTIVE_LOCKERS 1` → QR langsung tampil (22 Okt).
+30. Log `[sync]` tidak muncul di log Render — backend hanya mencatat `[sync] ... pintu terbuka/tertutup` saat `door_open` **berubah**. Dengan `ENABLE_DOOR_SENSOR false` firmware selalu mengirim `false`, jadi tidak ada log. Firmware kini mencetak `[Door]` dan `door0 terkirim` di Serial untuk dicocokkan. _Sedang diverifikasi._
 
 ---
 
@@ -453,10 +456,10 @@ Histori masalah & solusinya:
 - ☑ `wifi_client` — connect + reconnect (tested)
 - ☑ `backend_poller` (sync mode) — tested end-to-end
 - ☑ `lock_control` — compile OK, belum test relay fisik
-- ☑ `door_sensor` — compile OK, tested via jumper. **Direvisi 15 Okt:** debounce stabil, state awal dari pin, hanya `ACTIVE_LOCKERS` (belum diuji ulang)
+- ☑ `door_sensor` — compile OK, tested via jumper. **Direvisi 15 Okt** (debounce stabil, state awal dari pin, hanya `ACTIVE_LOCKERS`). **22 Okt:** bench test limit switch + debounce ✅ dengan TFT terpasang
 - ☑ `event_reporter` — terintegrasi ke `/sync` (`report_door_event()` tidak dipakai di alur utama)
-- ◐ `tft_render` — **15 Okt:** layar merespons di hardware asli (SPI mode 3, RES GPIO 5), teks tampil; **QR belum tampil**
-- ◐ `main.cpp` — **15 Okt:** direvisi (auto-lock saat pintu tertutup / batas `UNLOCK_HOLD_MS`, `openLatch`, `forceSync`, redraw QR hanya saat token berubah, konflik merge dibersihkan); belum diuji di hardware
+- ☑ `tft_render` — **22 Okt:** QR tampil di hardware asli (SPI mode 3, RES GPIO 5; QR digambar tanpa `startWrite()` di luar loop `fillRect`). Token dari backend tampil di firmware penuh (`ACTIVE_LOCKERS 1`)
+- ◐ `main.cpp` — **22 Okt:** firmware penuh jalan (WiFi + `/sync` + QR dari backend di TFT). Auto-lock, `openLatch`, `forceSync` dan jalur pintu belum terverifikasi lewat backend; Serial kini mencetak `[Door]` dan `door0 terkirim`
 - ☑ `config.h` di-set untuk 2 locker (`ACTIVE_LOCKERS 2` di production mode)
 
 ### App Petugas (Reza):
@@ -477,11 +480,11 @@ Histori masalah & solusinya:
 - □ Test end-to-end hardware fisik (butuh relay + solenoid + sensor + TFT dari Alfian)
 - □ Ganti password default `admin`/`petugas1`
 - □ Merge `feature/firmware` ke `main` lewat Pull Request
-- □ Debug QR di TFT (`tft_render_qr`) — belum tampil di hardware
-- □ Uji limit switch di hardware (ditunda)
-- □ Build & uji firmware penuh (`pio run -e esp32dev`) dengan `main.cpp` revisi
+- ☑ Debug QR di TFT — selesai 22 Okt (QR tampil)
+- ◐ Limit switch: bench test + debounce ✅ (22 Okt); lewat firmware penuh dan log backend ⏳. Wiring aktual: modul 3 pin (VCC→3V3, GND→GND, OUT→GPIO 34); polaritas (tertekan = TERTUTUP) perlu dicek
+- ◐ Firmware penuh (`esp32dev`): WiFi + sync + QR di TFT ✅ (22 Okt); jalur pintu, auto-lock, dan solenoid ⏳
 - □ Uji relay + solenoid; konfirmasi baut kunci bisa re-latch saat pintu ditutup (asumsi auto-lock)
-- □ Samakan `ACTIVE_LOCKERS` di `config.h` dengan skala 2 locker (versi yang terakhir dicek: development = 1, production = 4)
+- ☑ `ACTIVE_LOCKERS` di `config.h`: development 1, production 2 (22 Okt). Dengan satu layar terpasang harus 1
 - □ Putuskan solusi 2 TFT tanpa pin CS (modul ber-CS atau bus SPI terpisah)
 - □ Atasi cold start Render (30–60 dtk) vs watchdog firmware (30 dtk): naikkan WDT atau cron anti-sleep
 
@@ -551,7 +554,9 @@ Collapse key per `locker_id`, TTL (target 30 menit, kode saat ini 1 jam), dan pr
 - Env PlatformIO: `esp32dev` (firmware penuh), `bench` (tes TFT dengan library), `rawtft` (tes TFT mentah, SPI mode 3). Detail di `firmware/smart_locker_firmware_documentation.md`.
 - Deploy Fase 7 (route `/unregister-device` + service reminder/catch-up) wajib **Clear build cache & deploy** di Render — kalau tidak, route baru balas 404 HTML.
 - App Flutter butuh `flutter clean && flutter pub get && flutter run` setelah Fase 7 (tambah `flutter_local_notifications`).
-- Pengujian hardware berjalan bertahap: TFT dulu (mentah → library → QR), baru limit switch, lalu relay/solenoid.
+- Pengujian hardware berjalan bertahap: TFT dulu (mentah → library → QR), lalu limit switch, lalu relay/solenoid. Per 22 Okt: TFT ✅, limit switch (bench) ✅, relay/solenoid ⏳.
+- Env tambahan: `benchdoor` (tes limit switch + debounce dengan TFT terpasang).
+- Token QR yang tampil di firmware penuh berasal dari backend (rotator in-memory), bukan dummy. Dummy (`abc123`, `tok0001`, ...) hanya di env `bench`.
 
 ---
 
@@ -620,3 +625,12 @@ Collapse key per `locker_id`, TTL (target 30 menit, kode saat ini 1 jam), dan pr
 | 3. Fase 7          | Throttle 50 detik; accordion pakai `tag`; mode `catchup`; prioritas reminder normal; log diagnostik; temuan uji pertama |
 | 7. Troubleshooting | Tambah #24–#27 (throttle, `setOnlyAlertOnce`, `tag`, reminder masih diinvestigasi)                                      |
 | 8. Status          | Fase 7 ◐ (reminder belum muncul); tambah item debug reminder + samakan TTL                                              |
+
+## Rekap Perubahan — Update 22 Okt 2026 (firmware)
+
+| Section            | Yang diubah                                                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------------------- |
+| 7. Troubleshooting | Tambah #28–30: QR tidak tampil (`startWrite`), layar kosong (`ACTIVE_LOCKERS`), log `[sync]` tidak muncul |
+| 8. Status Firmware | `tft_render` ☑ (QR tampil); `door_sensor` bench ✅; `main.cpp` firmware penuh jalan, jalur pintu belum    |
+| 8. Belum           | Debug QR ☑; limit switch/firmware penuh ◐; `ACTIVE_LOCKERS` ☑                                             |
+| 11. Catatan        | Env `benchdoor`; token QR berasal dari backend, bukan dummy                                               |

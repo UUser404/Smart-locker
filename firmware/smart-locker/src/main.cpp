@@ -109,7 +109,10 @@ void loop()
     if (t == 1)
       openLatch[i] = true;
     if (t != 0)
+    {
       forceSync = true;
+      Serial.printf("[Door] Locker %d: %s\n", i, t == 1 ? "TERBUKA" : "TERTUTUP");
+    }
 
     if (!waitingForClose[i])
       continue;
@@ -190,7 +193,7 @@ void loop()
   for (int i = 0; i < NUM_LOCKERS; i++)
     openLatch[i] = false;
 
-  Serial.println("[Sync] OK");
+  Serial.printf("[Sync] OK (door0 terkirim=%d, 1=terbuka)\n", doorOpen[0]);
 
   // ============================================================
   // Proses commands
