@@ -68,7 +68,14 @@ function setStatus(lockerId, status) {
 }
 
 function setFrozen(lockerId, frozen) {
-    if (!store[lockerId]) return;
+    if (!store[lockerId]) {
+        // Kalau belum ada di memory, inisialisasi default dulu
+        store[lockerId] = {
+            status: "empty",
+            frozen: false,
+            qrTokens: []
+        };
+    }
     store[lockerId].frozen = frozen;
 }
 

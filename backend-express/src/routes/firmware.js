@@ -239,14 +239,18 @@ router.post("/:controllerId/sync", requireDeviceAuth, async (req, res) => {
     }
 });
 
-// Helper: proses event door closed
+/// Helper: proses event door closed
 async function handleDoorClosed(lockerId, locker) {
     const lockerRef = db.collection("lockers").doc(lockerId);
     const now = Timestamp.now();
 
-    if (locker.pendingEnd === true && locker.currentRentalId) {
+    // 🔥 PERBAIKAN: Baca state terbaru dari Firestore untuk menghindari race condition
+    const latestDoc = await lockerRef.get();
+    const latestLocker = latestDoc.data();
+
+    if (latestLocker.pendingEnd === true && latestLocker.currentRentalId) {
         // Finalisasi sesi
-        const rentalRef = db.collection("rentals").doc(locker.currentRentalId);
+        const rentalRef = db.collection("rentals").doc(latestLocker.currentRentalId);
         const rentalDoc = await rentalRef.get();
 
         if (rentalDoc.exists) {
@@ -273,12 +277,13 @@ async function handleDoorClosed(lockerId, locker) {
             pendingEnd: false,
         });
 
-        // Update tokenStore
-        const tokenStore = require("../services/tokenStoreService");
+        // 🔥 PERBAIKAN: Update in-memory token store agar QR berputar lagi
         tokenStore.setStatus(lockerId, "empty");
         tokenStore.setFrozen(lockerId, false);
+        console.log(`[tokenStore] ${lockerId} di-unfreeze (QR berputar lagi)`);
+
     } else {
-        // Cukup kunci lagi
+        // Cukup kunci lagi, sesi tetap jalan
         await lockerRef.update({
             unlockedSince: null,
             pendingCommand: null,
