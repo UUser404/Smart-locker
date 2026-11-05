@@ -5,7 +5,7 @@ const {
     notifyNeedsAttention
 } = require("./fcmService");
 
-const TIMEOUT_MS = 2 * 60 * 1000;
+const TIMEOUT_MS = 10 * 60 * 1000;
 let lastQuotaErrorLog = 0;
 const QUOTA_LOG_INTERVAL_MS = 5 * 60 * 1000; // log tiap 5 menit kalau quota habis
 

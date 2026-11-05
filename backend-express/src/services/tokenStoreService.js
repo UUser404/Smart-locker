@@ -122,6 +122,14 @@ function getLatestToken(lockerId) {
 function isTokenValid(lockerId, token) {
     const locker = store[lockerId];
     if (!locker) return false;
+
+    // Jika locker sedang dibekukan (occupied), 
+    // abaikan waktu kadaluarsa (expiresAt).
+    if (locker.frozen === true) {
+        return locker.qrTokens.some((t) => t.token === token);
+    }
+
+    // Jika tidak dibekukan (empty), terapkan aturan 60 detik seperti biasa
     const now = Date.now();
     return locker.qrTokens.some((t) => t.token === token && t.expiresAt > now);
 }
