@@ -218,7 +218,10 @@ router.post("/:id/access", async (req, res) => {
       if (!lockerDoc.exists) throw new Error("LOCKER_NOT_FOUND");
 
       const locker = lockerDoc.data();
-      if (locker.status !== "occupied") throw new Error("LOCKER_NOT_OCCUPIED");
+      // Izinkan akses jika status occupied ATAU needs_attention
+      if (locker.status !== "occupied" && locker.status !== "needs_attention") {
+        throw new Error("LOCKER_NOT_OCCUPIED");
+      }
       if (!locker.currentRentalId) throw new Error("NO_ACTIVE_RENTAL");
 
       const rentalRef = db.collection("rentals").doc(locker.currentRentalId);

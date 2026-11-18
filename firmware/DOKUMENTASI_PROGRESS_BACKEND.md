@@ -414,7 +414,7 @@ Histori masalah & solusinya:
 13. `RESOURCE_EXHAUSTED: Quota exceeded` — Firestore free tier harian habis. Penyebab: rotator token tulis Firestore terlalu sering. Solusi: Fase 1 (in-memory token rotation) — token disimpan di RAM, tidak tulis Firestore lagi.
 14. `SyntaxError: Unexpected token '?'` di `tokenStoreService.js` — kode `??` ketulis jadi `? ?` (ada spasi). Solusi: ganti `??` dengan if-else eksplisit.
 15. Watchdog trigger saat TFT belum terpasang — firmware coba render QR ke TFT yang tidak ada, SPI blocking. Solusi: `ENABLE_TFT false` di `config.h` untuk dev mode.
-16. GPIO 34-39 flapping (pintu terbuka-tutup tanpa henti) — pin input-only tidak punya internal pull-up. Solusi dev: `ENABLE_DOOR_SENSOR false`. Solusi hardware: resistor pull-up 10kΩ ke 3.3V.
+16. GPIO 34-39 flapping (pintu terbuka-tutup tanpa henti) — pin input-only tidak punya internal pull-up. Pastikan sensor menghasilkan level stabil; sensor sakelar tanpa rangkaian perlu resistor pull-up eksternal 10kΩ ke 3.3V. `ENABLE_DOOR_SENSOR false` hanya untuk pengujian saat sensor tidak tersambung.
 17. `[Sync] HTTP 404 Cannot POST /api/firmware/esp32_01/sync` — endpoint `/sync` belum ke-commit/deploy. Solusi: commit backend, push, deploy Render.
 18. **`401 INVALID_DEVICE_TOKEN` dengan token yang "sama"`** — 1 karakter hilang saat copy-paste token. Solusi: copy token dari Firestore Console (`controllers/esp32_01.authToken`), bandingkan karakter-per-karakter.
 19. FCM notification test offline — kalau HP penerima tidak terhubung internet, notifikasi tertahan di FCM dan baru muncul saat HP kembali online. Ini behavior by design (FCM TTL default 4 minggu). Sudah tested dan bekerja sesuai harapan.

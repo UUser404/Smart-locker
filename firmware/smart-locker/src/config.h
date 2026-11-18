@@ -14,11 +14,11 @@
 #if BUILD_MODE == BUILD_MODE_DEVELOPMENT
 #define ACTIVE_LOCKERS 1
 #define ENABLE_TFT true
-#define ENABLE_DOOR_SENSOR false
+#define ENABLE_DOOR_SENSOR true
 #else
 #define ACTIVE_LOCKERS 1
 #define ENABLE_TFT false
-#define ENABLE_DOOR_SENSOR false
+#define ENABLE_DOOR_SENSOR true
 #endif
 
 // ============================================================
