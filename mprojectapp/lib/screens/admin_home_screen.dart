@@ -33,6 +33,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
 
   // Track state agar tidak refresh saat app masih loading/error
   DateTime? _lastFetch;
+  bool _handlingExpiredSession = false;
 
   @override
   void initState() {
@@ -99,11 +100,35 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
       });
     } catch (e) {
       if (!mounted) return;
+      if (e is ApiException && e.statusCode == 401) {
+        await _handleExpiredSession();
+        return;
+      }
       setState(() {
         _loading = false;
         if (!silent) _error = 'Gagal memuat laporan: $e';
       });
     }
+  }
+
+  Future<void> _handleExpiredSession() async {
+    if (_handlingExpiredSession) return;
+    _handlingExpiredSession = true;
+
+    await _authService.logout();
+    if (!mounted) return;
+
+    final loginApi = ApiService();
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => LoginScreen(
+          authService: AuthService(loginApi),
+          fcmService: FcmService(loginApi),
+          notice: 'Sesi login kedaluwarsa. Silakan masuk kembali.',
+        ),
+      ),
+      (route) => false,
+    );
   }
 
   Future<void> _logout() async {
@@ -165,26 +190,64 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
       ),
     ];
 
-    return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() => _selectedIndex = index);
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.analytics_outlined),
-            selectedIcon: Icon(Icons.analytics),
-            label: 'Analitik',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long),
-            label: 'Riwayat',
-          ),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWideLayout = constraints.maxWidth >= 600;
+        return Scaffold(
+          body: isWideLayout
+              ? Row(
+                  children: [
+                    NavigationRail(
+                      selectedIndex: _selectedIndex,
+                      labelType: NavigationRailLabelType.all,
+                      onDestinationSelected: (index) {
+                        setState(() => _selectedIndex = index);
+                      },
+                      destinations: const [
+                        NavigationRailDestination(
+                          icon: Icon(Icons.analytics_outlined),
+                          selectedIcon: Icon(Icons.analytics),
+                          label: Text('Analitik'),
+                        ),
+                        NavigationRailDestination(
+                          icon: Icon(Icons.receipt_long_outlined),
+                          selectedIcon: Icon(Icons.receipt_long),
+                          label: Text('Riwayat'),
+                        ),
+                      ],
+                    ),
+                    const VerticalDivider(width: 1),
+                    Expanded(
+                      child: IndexedStack(
+                        index: _selectedIndex,
+                        children: pages,
+                      ),
+                    ),
+                  ],
+                )
+              : IndexedStack(index: _selectedIndex, children: pages),
+          bottomNavigationBar: isWideLayout
+              ? null
+              : NavigationBar(
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: (index) {
+                    setState(() => _selectedIndex = index);
+                  },
+                  destinations: const [
+                    NavigationDestination(
+                      icon: Icon(Icons.analytics_outlined),
+                      selectedIcon: Icon(Icons.analytics),
+                      label: 'Analitik',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.receipt_long_outlined),
+                      selectedIcon: Icon(Icons.receipt_long),
+                      label: 'Riwayat',
+                    ),
+                  ],
+                ),
+        );
+      },
     );
   }
 }

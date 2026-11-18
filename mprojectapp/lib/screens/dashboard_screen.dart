@@ -35,6 +35,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   StreamSubscription? _fgMessageSub;
   StreamSubscription? _openedAppSub;
   DateTime? _lastFetch;
+  bool _handlingExpiredSession = false;
 
   // Anti spam snackbar: track locker yang sudah di-snackbar pada sesi ini.
   // Reset saat locker keluar dari needs_attention.
@@ -137,11 +138,35 @@ class _DashboardScreenState extends State<DashboardScreen>
       _checkCatchUpSnackbars();
     } catch (e) {
       if (!mounted) return;
+      if (e is ApiException && e.statusCode == 401) {
+        await _handleExpiredSession();
+        return;
+      }
       setState(() {
         _loading = false;
         if (!silent) _error = 'Gagal memuat data: $e';
       });
     }
+  }
+
+  Future<void> _handleExpiredSession() async {
+    if (_handlingExpiredSession) return;
+    _handlingExpiredSession = true;
+
+    await _authService.logout();
+    if (!mounted) return;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => LoginScreen(
+          authService: _authService,
+          fcmService: widget.fcmService,
+          notice: 'Sesi login kedaluwarsa. Silakan masuk kembali.',
+        ),
+      ),
+      (route) => false,
+    );
+    unawaited(widget.fcmService.unregister());
   }
 
   /// Tampilkan snackbar catch-up untuk locker needs_attention yang belum
@@ -281,6 +306,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       _loadLockers(silent: true);
     } catch (e) {
       if (!mounted) return;
+      if (e is ApiException && e.statusCode == 401) {
+        await _handleExpiredSession();
+        return;
+      }
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Gagal resolve: $e')));
@@ -344,58 +373,63 @@ class _DashboardScreenState extends State<DashboardScreen>
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: [
-        ProfileHeader(
-          nama: widget.session.nama,
-          roleLabel: 'Petugas Keamanan',
-          roleColor: Colors.teal,
-          onLogout: _logout,
-        ),
-        const SizedBox(height: 16),
-        StatGrid(
-          cards: [
-            StatCard(
-              label: 'Kosong',
-              value: '${_countByStatus(LockerStatus.empty)}',
-              icon: Icons.lock_open,
-              color: Colors.green,
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1000),
+        child: ListView(
+          padding: const EdgeInsets.all(12),
+          children: [
+            ProfileHeader(
+              nama: widget.session.nama,
+              roleLabel: 'Petugas Keamanan',
+              roleColor: Colors.teal,
+              onLogout: _logout,
             ),
-            StatCard(
-              label: 'Terisi',
-              value: '${_countByStatus(LockerStatus.occupied)}',
-              icon: Icons.lock_outline,
-              color: Colors.orange,
+            const SizedBox(height: 16),
+            StatGrid(
+              cards: [
+                StatCard(
+                  label: 'Kosong',
+                  value: '${_countByStatus(LockerStatus.empty)}',
+                  icon: Icons.lock_open,
+                  color: Colors.green,
+                ),
+                StatCard(
+                  label: 'Terisi',
+                  value: '${_countByStatus(LockerStatus.occupied)}',
+                  icon: Icons.lock_outline,
+                  color: Colors.orange,
+                ),
+                StatCard(
+                  label: 'Perlu Perhatian',
+                  value: '${_countByStatus(LockerStatus.needsAttention)}',
+                  icon: Icons.warning_amber_rounded,
+                  color: Colors.red,
+                ),
+                StatCard(
+                  label: 'Total Locker',
+                  value: '${_lockers.length}',
+                  icon: Icons.grid_view_rounded,
+                  color: Colors.indigo,
+                ),
+              ],
             ),
-            StatCard(
-              label: 'Perlu Perhatian',
-              value: '${_countByStatus(LockerStatus.needsAttention)}',
-              icon: Icons.warning_amber_rounded,
-              color: Colors.red,
+            const SizedBox(height: 20),
+            const Text(
+              'Status Locker',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            StatCard(
-              label: 'Total Locker',
-              value: '${_lockers.length}',
-              icon: Icons.grid_view_rounded,
-              color: Colors.indigo,
-            ),
+            const SizedBox(height: 8),
+            if (_lockers.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: Text('Belum ada data locker')),
+              )
+            else
+              ..._lockers.map(_buildLockerTile),
           ],
         ),
-        const SizedBox(height: 20),
-        const Text(
-          'Status Locker',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        if (_lockers.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(child: Text('Belum ada data locker')),
-          )
-        else
-          ..._lockers.map(_buildLockerTile),
-      ],
+      ),
     );
   }
 

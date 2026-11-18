@@ -97,35 +97,40 @@ class _AdminHistoryScreenState extends State<AdminHistoryScreen> {
 
           // === LIST RIWAYAT ===
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: widget.onRefresh,
-              child: filtered.isEmpty
-                  ? ListView(
-                      children: [
-                        const SizedBox(height: 80),
-                        Icon(
-                          Icons.receipt_long_outlined,
-                          size: 48,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 12),
-                        Center(
-                          child: Text(
-                            'Belum ada riwayat ${_filterLabel()}',
-                            style: TextStyle(color: Colors.grey.shade600),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1000),
+                child: RefreshIndicator(
+                  onRefresh: widget.onRefresh,
+                  child: filtered.isEmpty
+                      ? ListView(
+                          children: [
+                            const SizedBox(height: 80),
+                            Icon(
+                              Icons.receipt_long_outlined,
+                              size: 48,
+                              color: Colors.grey.shade400,
+                            ),
+                            const SizedBox(height: 12),
+                            Center(
+                              child: Text(
+                                'Belum ada riwayat ${_filterLabel()}',
+                                style: TextStyle(color: Colors.grey.shade600),
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
                           ),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, i) =>
+                              _buildRentalTile(filtered[i]),
                         ),
-                      ],
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      itemCount: filtered.length,
-                      itemBuilder: (context, i) =>
-                          _buildRentalTile(filtered[i]),
-                    ),
+                ),
+              ),
             ),
           ),
         ],
