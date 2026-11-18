@@ -114,6 +114,13 @@ function rotateAll() {
 function getLatestToken(lockerId) {
     const locker = store[lockerId];
     if (!locker) return null;
+
+    // Jika sedang dibekukan (occupied), 
+    // kembalikan token terakhir tanpa peduli expired
+    if (locker.frozen === true) {
+        return locker.qrTokens.length > 0 ? locker.qrTokens[locker.qrTokens.length - 1].token : null;
+    }
+
     const now = Date.now();
     const valid = locker.qrTokens.filter((t) => t.expiresAt > now);
     return valid.length > 0 ? valid[valid.length - 1].token : null;
@@ -122,6 +129,14 @@ function getLatestToken(lockerId) {
 function isTokenValid(lockerId, token) {
     const locker = store[lockerId];
     if (!locker) return false;
+
+    // Jika locker sedang dibekukan (occupied), 
+    // abaikan waktu kadaluarsa (expiresAt).
+    if (locker.frozen === true) {
+        return locker.qrTokens.some((t) => t.token === token);
+    }
+
+    // Jika tidak dibekukan (empty), terapkan aturan 60 detik seperti biasa
     const now = Date.now();
     return locker.qrTokens.some((t) => t.token === token && t.expiresAt > now);
 }
