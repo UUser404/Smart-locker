@@ -87,55 +87,60 @@ class AdminAnalyticsScreen extends StatelessWidget {
       ),
       body: RefreshIndicator(
         onRefresh: onRefresh,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            ProfileHeader(
-              nama: session.nama,
-              roleLabel: 'Admin',
-              roleColor: Colors.indigo,
-              onLogout: onLogout,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                ProfileHeader(
+                  nama: session.nama,
+                  roleLabel: 'Admin',
+                  roleColor: Colors.indigo,
+                  onLogout: onLogout,
+                ),
+                const SizedBox(height: 20),
+
+                // ============ RINGKASAN STATISTIK ============
+                const Text(
+                  'Ringkasan',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                if (stats != null) _buildStatsGrid(stats!),
+
+                const SizedBox(height: 24),
+
+                // ============ STATUS LOCKER (BARU) ============
+                const Text(
+                  'Status Locker',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                _buildLockerStatusCard(),
+
+                const SizedBox(height: 24),
+
+                // ============ STATUS SEWA ============
+                const Text(
+                  'Status Sewa',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                _buildRentalStatusCard(),
+
+                const SizedBox(height: 24),
+
+                // ============ TOP LOCKER ============
+                const Text(
+                  'Top Locker',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                _buildTopLockersCard(),
+              ],
             ),
-            const SizedBox(height: 20),
-
-            // ============ RINGKASAN STATISTIK ============
-            const Text(
-              'Ringkasan',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            if (stats != null) _buildStatsGrid(stats!),
-
-            const SizedBox(height: 24),
-
-            // ============ STATUS LOCKER (BARU) ============
-            const Text(
-              'Status Locker',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            _buildLockerStatusCard(),
-
-            const SizedBox(height: 24),
-
-            // ============ STATUS SEWA ============
-            const Text(
-              'Status Sewa',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            _buildRentalStatusCard(),
-
-            const SizedBox(height: 24),
-
-            // ============ TOP LOCKER ============
-            const Text(
-              'Top Locker',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            _buildTopLockersCard(),
-          ],
+          ),
         ),
       ),
     );

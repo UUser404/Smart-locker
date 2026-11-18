@@ -129,9 +129,14 @@ class _StartupGateState extends State<_StartupGate> {
       // jaga-jaga token berubah sejak sesi terakhir.
       // Setelah register sukses, backend otomatis kirim catch-up notif
       // untuk locker needs_attention yang mungkin terlewat.
-      await _fcmService.initAndRegister(session.nama);
+      try {
+        await _fcmService.initAndRegister(session.nama);
+      } catch (e) {
+        debugPrint('[Startup] Gagal register FCM: $e');
+      }
     }
 
+    if (!mounted) return;
     setState(() {
       _resolvedScreen = session.role == UserRole.admin
           ? AdminHomeScreen(session: session)
