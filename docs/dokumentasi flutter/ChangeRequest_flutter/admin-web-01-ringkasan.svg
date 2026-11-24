@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="800" viewBox="0 0 1440 800" fill="none" xmlns:c2pa="http://c2pa.org/manifest">
+<g id="Admin Web - 01 Ringkasan">
+<rect x="0" y="0" width="1440" height="800" fill="#F5F7FA"/>
+<g id="Sidebar">
+<rect x="0" y="0" width="240" height="800" fill="#0F172A"/>
+<rect x="24" y="22" width="36" height="36" rx="10" fill="#1D4ED8"/>
+<g transform="translate(42 40)" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="-6" y="-1" width="12" height="9" rx="2"/><path d="M-3 -1V-4a3 3 0 0 1 6 0V-1"/></g>
+<text x="72" y="38" font-family="Inter, Roboto, Arial, sans-serif" font-size="16" font-weight="800" fill="#FFFFFF">Smart Locker</text>
+<text x="72" y="54" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#CBD5E1">Admin Console</text>
+<rect x="12" y="96" width="216" height="44" rx="12" fill="#1D4ED8"/>
+<g transform="translate(38 118)" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="-8" y="-8" width="6" height="6" rx="1.5"/><rect x="2" y="-8" width="6" height="6" rx="1.5"/><rect x="-8" y="2" width="6" height="6" rx="1.5"/><rect x="2" y="2" width="6" height="6" rx="1.5"/></g>
+<text x="62" y="123" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="800" fill="#FFFFFF">Ringkasan</text>
+<g transform="translate(38 166)" stroke="#CBD5E1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="-6" y="-1" width="12" height="9" rx="2"/><path d="M-3 -1V-4a3 3 0 0 1 6 0V-1"/></g>
+<text x="62" y="171" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="600" fill="#CBD5E1">Locker &amp; Perangkat</text>
+<g transform="translate(38 214)" stroke="#CBD5E1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle r="8"/><path d="M0 -4V0L3 2"/></g>
+<text x="62" y="219" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="600" fill="#CBD5E1">Riwayat Sewa</text>
+<g transform="translate(38 262)" stroke="#CBD5E1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M0 -9L8 -6V0C8 5 4 8 0 10C-4 8 -8 5 -8 0V-6Z"/></g>
+<text x="62" y="267" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="600" fill="#CBD5E1">Log Audit</text>
+<g transform="translate(38 310)" stroke="#CBD5E1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="0" cy="-4" r="3.5"/><path d="M-7 8C-7 2 7 2 7 8"/></g>
+<text x="62" y="315" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="600" fill="#CBD5E1">Petugas</text>
+<g transform="translate(38 358)" stroke="#CBD5E1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle r="2.5"/><circle r="7" stroke-dasharray="3 2.2"/></g>
+<text x="62" y="363" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="600" fill="#CBD5E1">Pengaturan</text>
+<line x1="16" y1="716" x2="224" y2="716" stroke="#1E293B" stroke-width="1"/>
+<circle cx="40" cy="752" r="18" fill="#1E293B"/>
+<text x="40" y="757" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="800" fill="#FFFFFF">A</text>
+<text x="68" y="748" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF">Admin</text>
+<text x="68" y="764" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#CBD5E1">Administrator</text>
+</g>
+<g id="Topbar">
+<rect x="240" y="0" width="1200" height="64" fill="#FFFFFF"/>
+<line x1="240" y1="64.5" x2="1440" y2="64.5" stroke="#E2E8F0" stroke-width="1"/>
+<text x="272" y="40" font-family="Inter, Roboto, Arial, sans-serif" font-size="20" font-weight="800" fill="#0F172A">Ringkasan</text>
+<rect x="1040" y="16" width="136" height="32" rx="16" fill="#F1F5F9"/>
+<text x="1056" y="36" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="600" fill="#475569">Unit STTI-01</text>
+<path d="M1156 30L1160 34L1164 30" fill="none" stroke="#64748B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1188" y="18" width="104" height="28" rx="14" fill="#DCFCE7"/>
+<circle cx="1204" cy="32" r="4" fill="#16A34A"/>
+<text x="1214" y="36.5" font-family="Inter, Roboto, Arial, sans-serif" font-size="12" font-weight="600" fill="#166534">2/2 Online</text>
+<circle cx="1330" cy="32" r="18" fill="#F1F5F9"/>
+<g transform="translate(1330 32)" stroke="#475569" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M-6 4H6C4 3 4 0 4 -3A4 4 0 0 0 -4 -3C-4 0 -4 3 -6 4Z"/><path d="M-2 7H2"/></g>
+<circle cx="1340" cy="22" r="4" fill="#DC2626"/>
+<circle cx="1380" cy="32" r="18" fill="#1D4ED8"/>
+<text x="1380" y="37" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="800" fill="#FFFFFF">A</text>
+</g>
+<g id="Banner Perhatian">
+<rect x="272.5" y="88.5" width="1135" height="55" rx="16" fill="#FFF7ED" stroke="#FDBA74" stroke-width="1"/>
+<circle cx="304" cy="116" r="16" fill="#FFEDD5"/>
+<g transform="translate(304 116)" stroke="#EA580C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="-5" y="-8" width="10" height="16" rx="2"/></g>
+<text x="332" y="112" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="800" fill="#0F172A">Locker 02 · pintu terbuka 06:12</text>
+<text x="332" y="130" font-family="Inter, Roboto, Arial, sans-serif" font-size="12" font-weight="400" fill="#64748B">Terbuka sejak 10:05 WIB · ESP32-02 online · petugas sudah diberi notifikasi</text>
+<rect x="1272" y="100" width="120" height="32" rx="12" fill="#EA580C"/>
+<text x="1332.0" y="120.68" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="800" fill="#FFFFFF">Lihat detail</text>
+</g>
+<g id="KPI Cards">
+<rect x="272.5" y="160.5" width="271" height="95" rx="16" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+<text x="292" y="190" font-family="Inter, Roboto, Arial, sans-serif" font-size="12" font-weight="600" fill="#64748B">Sewa hari ini</text>
+<text x="292" y="226" font-family="Inter, Roboto, Arial, sans-serif" font-size="30" font-weight="800" fill="#0F172A">5</text>
+<text x="292" y="244" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#166534">+2 dibanding kemarin</text>
+<rect x="560.5" y="160.5" width="271" height="95" rx="16" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+<text x="580" y="190" font-family="Inter, Roboto, Arial, sans-serif" font-size="12" font-weight="600" fill="#64748B">Rata-rata durasi</text>
+<text x="580" y="226" font-family="Inter, Roboto, Arial, sans-serif" font-size="30" font-weight="800" fill="#0F172A">42 mnt</text>
+<text x="580" y="244" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">dari 4 sesi selesai</text>
+<rect x="848.5" y="160.5" width="271" height="95" rx="16" fill="#FFF7ED" stroke="#FDBA74" stroke-width="1"/>
+<text x="868" y="190" font-family="Inter, Roboto, Arial, sans-serif" font-size="12" font-weight="600" fill="#64748B">Kejadian perhatian</text>
+<text x="868" y="226" font-family="Inter, Roboto, Arial, sans-serif" font-size="30" font-weight="800" fill="#EA580C">2</text>
+<text x="868" y="244" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#C2410C">1 sedang berlangsung</text>
+<rect x="1136.5" y="160.5" width="271" height="95" rx="16" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+<text x="1156" y="190" font-family="Inter, Roboto, Arial, sans-serif" font-size="12" font-weight="600" fill="#64748B">Buka darurat</text>
+<text x="1156" y="226" font-family="Inter, Roboto, Arial, sans-serif" font-size="30" font-weight="800" fill="#DC2626">2</text>
+<text x="1156" y="244" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#B91C1C">1 gagal · ESP32-02</text>
+</g>
+<g id="Status Locker">
+<text x="272" y="292" font-family="Inter, Roboto, Arial, sans-serif" font-size="15" font-weight="800" fill="#0F172A">Status locker</text>
+<rect x="272.5" y="304.5" width="343" height="175" rx="16" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+<circle cx="308" cy="340" r="18" fill="#DBEAFE"/>
+<text x="308" y="345" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="800" fill="#2563EB">01</text>
+<text x="338" y="337" font-family="Inter, Roboto, Arial, sans-serif" font-size="15" font-weight="800" fill="#0F172A">Locker 01</text>
+<text x="338" y="355" font-family="Inter, Roboto, Arial, sans-serif" font-size="12" font-weight="400" fill="#64748B">Budi Santoso · 0812****7890</text>
+<rect x="539" y="326" width="61" height="22" rx="11.0" fill="#DBEAFE"/>
+<text x="569.5" y="340.6" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="10" font-weight="800" fill="#1D4ED8">DISEWA</text>
+<text x="292" y="410" font-family="Inter, Roboto, Arial, sans-serif" font-size="30" font-weight="800" fill="#2563EB">00:11:24</text>
+<text x="292" y="430" font-family="Inter, Roboto, Arial, sans-serif" font-size="12" font-weight="400" fill="#64748B">durasi sewa</text>
+<line x1="292" y1="444.5" x2="596" y2="444.5" stroke="#E2E8F0" stroke-width="1"/>
+<circle cx="296" cy="464" r="4" fill="#16A34A"/>
+<text x="306" y="468" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#475569">ESP32-01 · <tspan font-weight="700" fill="#16A34A">Online</tspan> · 1 dtk lalu</text>
+<rect x="528" y="452" width="68" height="28" rx="12" fill="#F1F5F9"/>
+<text x="562.0" y="470.32" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="12" font-weight="700" fill="#475569">Detail</text>
+<rect x="632.5" y="304.5" width="343" height="175" rx="16" fill="#FFF7ED" stroke="#FDBA74" stroke-width="1"/>
+<circle cx="668" cy="340" r="18" fill="#FFEDD5"/>
+<text x="668" y="345" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="800" fill="#EA580C">02</text>
+<text x="698" y="337" font-family="Inter, Roboto, Arial, sans-serif" font-size="15" font-weight="800" fill="#0F172A">Locker 02</text>
+<text x="698" y="355" font-family="Inter, Roboto, Arial, sans-serif" font-size="12" font-weight="400" fill="#64748B">Tidak ada penyewa aktif</text>
+<rect x="879" y="326" width="81" height="22" rx="11.0" fill="#FFEDD5"/>
+<text x="919.5" y="340.6" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="10" font-weight="800" fill="#C2410C">PERHATIAN</text>
+<text x="652" y="410" font-family="Inter, Roboto, Arial, sans-serif" font-size="30" font-weight="800" fill="#DC2626">06:12</text>
+<text x="652" y="430" font-family="Inter, Roboto, Arial, sans-serif" font-size="12" font-weight="400" fill="#64748B">pintu terbuka</text>
+<line x1="652" y1="444.5" x2="956" y2="444.5" stroke="#E2E8F0" stroke-width="1"/>
+<circle cx="656" cy="464" r="4" fill="#16A34A"/>
+<text x="666" y="468" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#475569">ESP32-02 · <tspan font-weight="700" fill="#16A34A">Online</tspan> · 2 dtk lalu</text>
+<rect x="888" y="452" width="68" height="28" rx="12" fill="#F1F5F9"/>
+<text x="922.0" y="470.32" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="12" font-weight="700" fill="#475569">Detail</text>
+</g>
+<g id="Kejadian Terbaru">
+<rect x="992.5" y="288.5" width="415" height="435" rx="16" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+<text x="1016" y="322" font-family="Inter, Roboto, Arial, sans-serif" font-size="15" font-weight="800" fill="#0F172A">Kejadian terbaru</text>
+<text x="1384" y="322" text-anchor="end" font-family="Inter, Roboto, Arial, sans-serif" font-size="12" font-weight="700" fill="#1D4ED8">Lihat semua</text>
+<circle cx="1024" cy="368" r="5" fill="#EA580C"/>
+<text x="1044" y="366" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">Locker 02 pintu terbuka &gt; 2 menit</text>
+<text x="1044" y="384" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">10:05 · Sistem</text>
+<line x1="1016" y1="396.5" x2="1384" y2="396.5" stroke="#F1F5F9" stroke-width="1"/>
+<circle cx="1024" cy="424" r="5" fill="#DC2626"/>
+<text x="1044" y="422" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">Buka darurat Locker 01</text>
+<text x="1044" y="440" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">10:03 · Petugas A · Lupa kode</text>
+<line x1="1016" y1="452.5" x2="1384" y2="452.5" stroke="#F1F5F9" stroke-width="1"/>
+<circle cx="1024" cy="480" r="5" fill="#2563EB"/>
+<text x="1044" y="478" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">Locker 01 disewa · Budi Santoso</text>
+<text x="1044" y="496" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">10:00 · Sesi #S-8492</text>
+<line x1="1016" y1="508.5" x2="1384" y2="508.5" stroke="#F1F5F9" stroke-width="1"/>
+<circle cx="1024" cy="536" r="5" fill="#DC2626"/>
+<text x="1044" y="534" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">Buka darurat Locker 02 gagal</text>
+<text x="1044" y="552" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">09:41 · ESP32-02 tidak merespons</text>
+<line x1="1016" y1="564.5" x2="1384" y2="564.5" stroke="#F1F5F9" stroke-width="1"/>
+<circle cx="1024" cy="592" r="5" fill="#16A34A"/>
+<text x="1044" y="590" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">Locker 02 diselesaikan · Petugas B</text>
+<text x="1044" y="608" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">09:12 · Resolve &amp; kosongkan</text>
+<line x1="1016" y1="620.5" x2="1384" y2="620.5" stroke="#F1F5F9" stroke-width="1"/>
+<circle cx="1024" cy="648" r="5" fill="#DC2626"/>
+<text x="1044" y="646" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">ESP32-01 offline 2 menit</text>
+<text x="1044" y="664" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">08:55 · Sistem · sudah pulih</text>
+</g>
+<g id="Chart Pemakaian per Jam">
+<rect x="272.5" y="504.5" width="703" height="219" rx="16" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+<text x="296" y="538" font-family="Inter, Roboto, Arial, sans-serif" font-size="15" font-weight="800" fill="#0F172A">Pemakaian per jam</text>
+<text x="952" y="538" text-anchor="end" font-family="Inter, Roboto, Arial, sans-serif" font-size="12" font-weight="400" fill="#64748B">7 hari terakhir</text>
+<line x1="296" y1="692.5" x2="952" y2="692.5" stroke="#F1F5F9" stroke-width="1"/>
+<line x1="296" y1="642.5" x2="952" y2="642.5" stroke="#F1F5F9" stroke-width="1"/>
+<line x1="296" y1="592.5" x2="952" y2="592.5" stroke="#F1F5F9" stroke-width="1"/>
+<rect x="316" y="672" width="32" height="20" rx="6" fill="#BFDBFE"/>
+<text x="332" y="710" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">07</text>
+<rect x="380" y="652" width="32" height="40" rx="6" fill="#BFDBFE"/>
+<text x="396" y="710" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">08</text>
+<rect x="444" y="632" width="32" height="60" rx="6" fill="#BFDBFE"/>
+<text x="460" y="710" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">09</text>
+<rect x="508" y="592" width="32" height="100" rx="6" fill="#2563EB"/>
+<text x="524" y="710" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">10</text>
+<rect x="572" y="632" width="32" height="60" rx="6" fill="#BFDBFE"/>
+<text x="588" y="710" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">11</text>
+<rect x="636" y="652" width="32" height="40" rx="6" fill="#BFDBFE"/>
+<text x="652" y="710" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">12</text>
+<rect x="700" y="612" width="32" height="80" rx="6" fill="#BFDBFE"/>
+<text x="716" y="710" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">13</text>
+<rect x="764" y="592" width="32" height="100" rx="6" fill="#2563EB"/>
+<text x="780" y="710" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">14</text>
+<rect x="828" y="652" width="32" height="40" rx="6" fill="#BFDBFE"/>
+<text x="844" y="710" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">15</text>
+<rect x="892" y="672" width="32" height="20" rx="6" fill="#BFDBFE"/>
+<text x="908" y="710" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#64748B">16</text>
+</g>
+</g>
+<metadata><c2pa:manifest>AAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTo1NGZlYTIyNC1lMzM2LTRlMjQtOWIxNy03ODViYmYyMGI2ZDYAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaGIdc41Yr5gHojDrnkFETAkAAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDoyOGFlNjRjNy02MGUxLTRjMDctOTJmNy0zMzMwZGFlNGNmNThscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNoI3PmwqmFYqhuF0YLEgH2QQAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFgg0sD1RFeSrmxQdaBLZ5907D0QWvAK8n3Ufg+CfjGvdz+kZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaCHAqzJ7vbF+Vkd0Xd2OeyIAAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRMAAAAAAAAAAAAAAAAZGhhc2hYIKMCUEqNoSalkr3KCgpYJA3Kt2vqyNExzLBZqaszxP1uZG5hbWVuanVtYmYgbWFuaWZlc3RqZXhjbHVzaW9uc4GiZXN0YXJ0GUQ0Zmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOjU0ZmVhMjI0LWUzMzYtNGUyNC05YjE3LTc4NWJiZjIwYjZkNi9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOjk2MmVjM2QwLTc4YTYtNDVlYi05MTBkLTQ1ZTE5NWUzMjUwNHJjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCDSwPVEV5KubFB1oEtnn3TsPRBa8AryfdR+D4J+Ma93P6JjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFgg6+Q2yltIyPqB13F/76v6R4aCl2puUq6YoFJQ6qo8Lq6iY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFggu+2fJNvMNufObayey9Yz+N7IkrpB6gmT4zqQHXFome50Y2xhaW1fZ2VuZXJhdG9yX2luZm+jZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g/oGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd/3cyjxFA3Qo5S46fX0/ihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB/wQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj+OPEz5o+nMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn/aArXyTwFAZfKrPzxF2vPoJNf1+UCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9+1rdDwSPLMOPOjKuiXjoU/pUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQEq9W4BhXBYhEHo1h+GUq4Nfx/UclVQfKEoTEBvjl5PKAnwNhjAjYO/km2eIO17VsoqbY3B1XBDksC1YNpCxdpo=</c2pa:manifest></metadata></svg>

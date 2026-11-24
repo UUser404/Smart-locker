@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="800" viewBox="0 0 1440 800" fill="none" xmlns:c2pa="http://c2pa.org/manifest">
+<g id="Admin Web - 02 Riwayat Sewa">
+<rect x="0" y="0" width="1440" height="800" fill="#F5F7FA"/>
+<g id="Sidebar">
+<rect x="0" y="0" width="240" height="800" fill="#0F172A"/>
+<rect x="24" y="22" width="36" height="36" rx="10" fill="#1D4ED8"/>
+<g transform="translate(42 40)" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="-6" y="-1" width="12" height="9" rx="2"/><path d="M-3 -1V-4a3 3 0 0 1 6 0V-1"/></g>
+<text x="72" y="38" font-family="Inter, Roboto, Arial, sans-serif" font-size="16" font-weight="800" fill="#FFFFFF">Smart Locker</text>
+<text x="72" y="54" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#CBD5E1">Admin Console</text>
+<g transform="translate(38 118)" stroke="#CBD5E1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="-8" y="-8" width="6" height="6" rx="1.5"/><rect x="2" y="-8" width="6" height="6" rx="1.5"/><rect x="-8" y="2" width="6" height="6" rx="1.5"/><rect x="2" y="2" width="6" height="6" rx="1.5"/></g>
+<text x="62" y="123" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="600" fill="#CBD5E1">Ringkasan</text>
+<g transform="translate(38 166)" stroke="#CBD5E1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="-6" y="-1" width="12" height="9" rx="2"/><path d="M-3 -1V-4a3 3 0 0 1 6 0V-1"/></g>
+<text x="62" y="171" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="600" fill="#CBD5E1">Locker &amp; Perangkat</text>
+<rect x="12" y="192" width="216" height="44" rx="12" fill="#1D4ED8"/>
+<g transform="translate(38 214)" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle r="8"/><path d="M0 -4V0L3 2"/></g>
+<text x="62" y="219" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="800" fill="#FFFFFF">Riwayat Sewa</text>
+<g transform="translate(38 262)" stroke="#CBD5E1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M0 -9L8 -6V0C8 5 4 8 0 10C-4 8 -8 5 -8 0V-6Z"/></g>
+<text x="62" y="267" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="600" fill="#CBD5E1">Log Audit</text>
+<g transform="translate(38 310)" stroke="#CBD5E1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="0" cy="-4" r="3.5"/><path d="M-7 8C-7 2 7 2 7 8"/></g>
+<text x="62" y="315" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="600" fill="#CBD5E1">Petugas</text>
+<g transform="translate(38 358)" stroke="#CBD5E1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle r="2.5"/><circle r="7" stroke-dasharray="3 2.2"/></g>
+<text x="62" y="363" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="600" fill="#CBD5E1">Pengaturan</text>
+<line x1="16" y1="716" x2="224" y2="716" stroke="#1E293B" stroke-width="1"/>
+<circle cx="40" cy="752" r="18" fill="#1E293B"/>
+<text x="40" y="757" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="800" fill="#FFFFFF">A</text>
+<text x="68" y="748" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF">Admin</text>
+<text x="68" y="764" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="400" fill="#CBD5E1">Administrator</text>
+</g>
+<g id="Topbar">
+<rect x="240" y="0" width="1200" height="64" fill="#FFFFFF"/>
+<line x1="240" y1="64.5" x2="1440" y2="64.5" stroke="#E2E8F0" stroke-width="1"/>
+<text x="272" y="40" font-family="Inter, Roboto, Arial, sans-serif" font-size="20" font-weight="800" fill="#0F172A">Riwayat Sewa</text>
+<rect x="1040" y="16" width="136" height="32" rx="16" fill="#F1F5F9"/>
+<text x="1056" y="36" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="600" fill="#475569">Unit STTI-01</text>
+<path d="M1156 30L1160 34L1164 30" fill="none" stroke="#64748B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1188" y="18" width="104" height="28" rx="14" fill="#DCFCE7"/>
+<circle cx="1204" cy="32" r="4" fill="#16A34A"/>
+<text x="1214" y="36.5" font-family="Inter, Roboto, Arial, sans-serif" font-size="12" font-weight="600" fill="#166534">2/2 Online</text>
+<circle cx="1330" cy="32" r="18" fill="#F1F5F9"/>
+<g transform="translate(1330 32)" stroke="#475569" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M-6 4H6C4 3 4 0 4 -3A4 4 0 0 0 -4 -3C-4 0 -4 3 -6 4Z"/><path d="M-2 7H2"/></g>
+<circle cx="1340" cy="22" r="4" fill="#DC2626"/>
+<circle cx="1380" cy="32" r="18" fill="#1D4ED8"/>
+<text x="1380" y="37" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="14" font-weight="800" fill="#FFFFFF">A</text>
+</g>
+<g id="Filter Bar">
+<rect x="272.5" y="88.5" width="359" height="43" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+<g transform="translate(296 110)" stroke="#94A3B8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="-1.5" cy="-1.5" r="6"/><path d="M3 3L8 8"/></g>
+<text x="316" y="115" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#94A3B8">Cari nama, nomor, atau ID sesi</text>
+<rect x="644.5" y="88.5" width="123" height="43" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+<text x="660" y="115" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="600" fill="#475569">Hari ini</text>
+<path d="M744 107L748 111L752 107" fill="none" stroke="#64748B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="780.5" y="88.5" width="143" height="43" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+<text x="796" y="115" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="600" fill="#475569">Semua locker</text>
+<path d="M900 107L904 111L908 107" fill="none" stroke="#64748B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="936.5" y="88.5" width="139" height="43" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+<text x="952" y="115" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="600" fill="#475569">Semua status</text>
+<path d="M1052 107L1056 111L1060 107" fill="none" stroke="#64748B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1268" y="88" width="140" height="44" rx="14" fill="#1D4ED8"/>
+<text x="1338.0" y="114.68" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="800" fill="#FFFFFF">Ekspor CSV</text>
+<g transform="translate(1296 110)" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M0 -8V4M-5 0L0 5L5 0M-8 8H8"/></g>
+</g>
+<g id="Tabel Riwayat">
+<rect x="272.5" y="148.5" width="1135" height="515" rx="16" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+<path d="M273 164Q273 149 288 149H1392Q1407 149 1407 164V193H273Z" fill="#F8FAFC"/>
+<text x="296" y="176" letter-spacing="0.6" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="700" fill="#64748B">ID Sesi</text>
+<text x="392" y="176" letter-spacing="0.6" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="700" fill="#64748B">Locker</text>
+<text x="472" y="176" letter-spacing="0.6" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="700" fill="#64748B">Penyewa</text>
+<text x="668" y="176" letter-spacing="0.6" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="700" fill="#64748B">Telepon</text>
+<text x="812" y="176" letter-spacing="0.6" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="700" fill="#64748B">Mulai</text>
+<text x="940" y="176" letter-spacing="0.6" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="700" fill="#64748B">Selesai</text>
+<text x="1068" y="176" letter-spacing="0.6" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="700" fill="#64748B">Durasi</text>
+<text x="1160" y="176" letter-spacing="0.6" font-family="Inter, Roboto, Arial, sans-serif" font-size="11" font-weight="700" fill="#64748B">Status</text>
+<text x="296" y="223" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#1D4ED8">#S-8492</text>
+<text x="392" y="223" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">Locker 01</text>
+<text x="472" y="223" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">Budi Santoso</text>
+<text x="668" y="223" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#64748B">0812****7890</text>
+<text x="812" y="223" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">10:00</text>
+<text x="940" y="223" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">sekarang</text>
+<text x="1068" y="223" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#2563EB">00:11:24</text>
+<rect x="1160" y="207" width="74" height="22" rx="11.0" fill="#DBEAFE"/>
+<text x="1197.0" y="221.6" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="10" font-weight="800" fill="#1D4ED8">Berjalan</text>
+<line x1="273" y1="244.5" x2="1407" y2="244.5" stroke="#F1F5F9" stroke-width="1"/>
+<text x="296" y="275" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#1D4ED8">#S-8491</text>
+<text x="392" y="275" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">Locker 02</text>
+<text x="472" y="275" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">Sinta Rahma</text>
+<text x="668" y="275" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#64748B">0857****2201</text>
+<text x="812" y="275" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">08:30</text>
+<text x="940" y="275" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">09:12</text>
+<text x="1068" y="275" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">00:42:07</text>
+<rect x="1160" y="259" width="68" height="22" rx="11.0" fill="#DCFCE7"/>
+<text x="1194.0" y="273.6" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="10" font-weight="800" fill="#166534">Selesai</text>
+<line x1="273" y1="296.5" x2="1407" y2="296.5" stroke="#F1F5F9" stroke-width="1"/>
+<text x="296" y="327" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#1D4ED8">#S-8490</text>
+<text x="392" y="327" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">Locker 01</text>
+<text x="472" y="327" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">Rafi Pratama</text>
+<text x="668" y="327" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#64748B">0813****5518</text>
+<text x="812" y="327" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">08:02</text>
+<text x="940" y="327" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">08:49</text>
+<text x="1068" y="327" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">00:47:12</text>
+<rect x="1160" y="311" width="68" height="22" rx="11.0" fill="#DCFCE7"/>
+<text x="1194.0" y="325.6" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="10" font-weight="800" fill="#166534">Selesai</text>
+<line x1="273" y1="348.5" x2="1407" y2="348.5" stroke="#F1F5F9" stroke-width="1"/>
+<text x="296" y="379" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#1D4ED8">#S-8489</text>
+<text x="392" y="379" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">Locker 02</text>
+<text x="472" y="379" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">Dewi Lestari</text>
+<text x="668" y="379" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#64748B">0821****9034</text>
+<text x="812" y="379" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">07:44</text>
+<text x="940" y="379" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">08:15</text>
+<text x="1068" y="379" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">00:31:40</text>
+<rect x="1160" y="363" width="68" height="22" rx="11.0" fill="#DCFCE7"/>
+<text x="1194.0" y="377.6" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="10" font-weight="800" fill="#166534">Selesai</text>
+<line x1="273" y1="400.5" x2="1407" y2="400.5" stroke="#F1F5F9" stroke-width="1"/>
+<text x="296" y="431" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#1D4ED8">#S-8488</text>
+<text x="392" y="431" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">Locker 01</text>
+<text x="472" y="431" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">Ahmad Fauzi</text>
+<text x="668" y="431" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#64748B">0896****1177</text>
+<text x="812" y="431" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">07:10</text>
+<text x="940" y="431" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">07:58</text>
+<text x="1068" y="431" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">00:48:03</text>
+<rect x="1160" y="415" width="68" height="22" rx="11.0" fill="#DCFCE7"/>
+<text x="1194.0" y="429.6" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="10" font-weight="800" fill="#166534">Selesai</text>
+<line x1="273" y1="452.5" x2="1407" y2="452.5" stroke="#F1F5F9" stroke-width="1"/>
+<text x="296" y="483" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#1D4ED8">#S-8487</text>
+<text x="392" y="483" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">Locker 02</text>
+<text x="472" y="483" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">Nadia Putri</text>
+<text x="668" y="483" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#64748B">0812****6620</text>
+<text x="812" y="483" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">23 Nov 16:20</text>
+<text x="940" y="483" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">23 Nov 17:05</text>
+<text x="1068" y="483" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">00:45:11</text>
+<rect x="1160" y="467" width="68" height="22" rx="11.0" fill="#DCFCE7"/>
+<text x="1194.0" y="481.6" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="10" font-weight="800" fill="#166534">Selesai</text>
+<line x1="273" y1="504.5" x2="1407" y2="504.5" stroke="#F1F5F9" stroke-width="1"/>
+<text x="296" y="535" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#1D4ED8">#S-8486</text>
+<text x="392" y="535" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">Locker 01</text>
+<text x="472" y="535" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">Hasan Maulana</text>
+<text x="668" y="535" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#64748B">0852****3345</text>
+<text x="812" y="535" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">23 Nov 15:02</text>
+<text x="940" y="535" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">23 Nov 16:30</text>
+<text x="1068" y="535" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">01:28:40</text>
+<rect x="1160" y="519" width="101" height="22" rx="11.0" fill="#FEE2E2"/>
+<text x="1210.5" y="533.6" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="10" font-weight="800" fill="#B91C1C">Buka darurat</text>
+<line x1="273" y1="556.5" x2="1407" y2="556.5" stroke="#F1F5F9" stroke-width="1"/>
+<text x="296" y="587" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#1D4ED8">#S-8485</text>
+<text x="392" y="587" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">Locker 02</text>
+<text x="472" y="587" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">Laila Zahra</text>
+<text x="668" y="587" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#64748B">0813****7712</text>
+<text x="812" y="587" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">23 Nov 14:10</text>
+<text x="940" y="587" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569">23 Nov 14:52</text>
+<text x="1068" y="587" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#0F172A">00:42:30</text>
+<rect x="1160" y="571" width="121" height="22" rx="11.0" fill="#FFEDD5"/>
+<text x="1220.5" y="585.6" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="10" font-weight="800" fill="#C2410C">Resolve petugas</text>
+<line x1="273" y1="608.5" x2="1407" y2="608.5" stroke="#F1F5F9" stroke-width="1"/>
+<text x="296" y="642" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="400" fill="#64748B">Menampilkan 1-8 dari 124 sesi</text>
+<rect x="1212" y="622" width="32" height="32" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+<text x="1228" y="643" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#475569">‹</text>
+<rect x="1252" y="622" width="32" height="32" rx="12" fill="#1D4ED8"/>
+<text x="1268" y="643" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF">1</text>
+<rect x="1292" y="622" width="32" height="32" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+<text x="1308" y="643" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#475569">2</text>
+<rect x="1332" y="622" width="32" height="32" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+<text x="1348" y="643" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#475569">3</text>
+<rect x="1372" y="622" width="32" height="32" rx="12" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+<text x="1388" y="643" text-anchor="middle" font-family="Inter, Roboto, Arial, sans-serif" font-size="13" font-weight="700" fill="#475569">›</text>
+</g>
+</g>
+<metadata><c2pa:manifest>AAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTplMWFhYmUxMy02YTdlLTQ1ZjYtYjAwZS1mMDdlZWViOTg3NGYAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaCmlVy4YeH52CrAT773DeT8AAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDoyNDg1NzkyNC05MTJmLTQxODUtOTNkNy04ZjNjZjcwZDI2MGZscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNoXe6hpFXnErknXkQJzW1h2AAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFgg94/If6aKkDWk2fjmXc2wkqJeRKbj/qEQcd4wFhxuyPekZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaP9UTpFGVHtQZYBhQF+GdlcAAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRMAAAAAAAAAAAAAAAAZGhhc2hYIKJa0r22Pu6vfanBFEdrTVp+6ijDh6yy4m47e5mrCHUfZG5hbWVuanVtYmYgbWFuaWZlc3RqZXhjbHVzaW9uc4GiZXN0YXJ0GU3YZmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOmUxYWFiZTEzLTZhN2UtNDVmNi1iMDBlLWYwN2VlZWI5ODc0Zi9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOjYxMDRmNzhlLWExMDEtNGQwNi05ZTQxLTlhMjI5NjBiMTUxM3JjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCD3j8h/poqQNaTZ+OZdzbCSol5EpuP+oRBx3jAWHG7I96JjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFggyRtySs8TpHi9TzELJNIBjkmlQ/6Gjz5mSf6ZxfraP6GiY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFgg1p1CkYLMPqZXqy5ZJunHGYzAr9OysjNvHFe/GHqcpVF0Y2xhaW1fZ2VuZXJhdG9yX2luZm+jZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g/oGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd/3cyjxFA3Qo5S46fX0/ihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB/wQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj+OPEz5o+nMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn/aArXyTwFAZfKrPzxF2vPoJNf1+UCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9+1rdDwSPLMOPOjKuiXjoU/pUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQKJrUGO3i0n2M3DRrDdVF/PUBLklFhYD+N3vyfeDnliEJG+JG9lcNpU0bu976I9fsYfTc8vJuAKMAdlXiZFqm0w=</c2pa:manifest></metadata></svg>
