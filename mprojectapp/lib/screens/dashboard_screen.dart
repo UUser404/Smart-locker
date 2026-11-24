@@ -446,7 +446,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           itemCount: _lockers.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            mainAxisExtent: 118,
+            mainAxisExtent: 156,
             crossAxisSpacing: AppSpace.s3,
             mainAxisSpacing: AppSpace.s2,
           ),
@@ -483,17 +483,20 @@ class _DashboardScreenState extends State<DashboardScreen>
                         label: 'Kosong',
                         value: '${_countByStatus(LockerStatus.empty)}',
                         style: AppStatus.success,
+                        valueOnTop: true,
                       ),
                       DesignMetricCard(
                         label: 'Disewa',
                         value: '${_countByStatus(LockerStatus.occupied)}',
                         style: AppStatus.info,
+                        valueOnTop: true,
                       ),
                       DesignMetricCard(
                         label: 'Perhatian',
                         value: '${attention.length}',
                         style: AppStatus.warning,
                         highlighted: attention.isNotEmpty,
+                        valueOnTop: true,
                       ),
                     ],
                   );
@@ -529,6 +532,31 @@ class _DashboardScreenState extends State<DashboardScreen>
               else
                 lockerCards,
               const SizedBox(height: AppSpace.s4),
+              Container(
+                padding: const EdgeInsets.all(AppSpace.s4),
+                decoration: BoxDecoration(
+                  color: AppColors.neutralFillMuted,
+                  borderRadius: BorderRadius.circular(AppRadius.field),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AKTIVITAS TERAKHIR',
+                      style: AppType.overline.copyWith(
+                        color: AppColors.neutralTextMuted,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpace.s2),
+                    Text(
+                      'Riwayat kejadian belum tersedia dari API.',
+                      style: AppType.caption.copyWith(
+                        color: AppColors.neutralTextBody,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -601,8 +629,20 @@ class _AttentionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final openedAt = locker.needsAttentionSince ?? locker.unlockedSince;
+    final elapsedSeconds = openedAt == null
+        ? null
+        : DateTime.now().difference(openedAt).inSeconds;
+    final safeElapsedSeconds = elapsedSeconds == null || elapsedSeconds < 0
+        ? null
+        : elapsedSeconds;
+    final elapsedLabel = safeElapsedSeconds == null
+        ? '--:--'
+        : '${(safeElapsedSeconds ~/ 60).toString().padLeft(2, '0')}:'
+              '${(safeElapsedSeconds % 60).toString().padLeft(2, '0')}';
+
     return Card(
-      color: AppStatus.warning.tint,
+      color: AppColors.neutralSurface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.hero),
         side: const BorderSide(color: AppColors.warningBorder),
@@ -616,24 +656,57 @@ class _AttentionCard extends StatelessWidget {
               onTap: onTap,
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.warning_amber_rounded,
-                    color: AppColors.warningMain,
+                  Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: AppColors.warningContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      color: AppColors.warningMain,
+                    ),
                   ),
                   const SizedBox(width: AppSpace.s2),
                   Expanded(
-                    child: Text(locker.lockerId, style: AppType.subtitle),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(locker.lockerId, style: AppType.subtitle),
+                        Text(
+                          'Pintu terbuka · ${locker.needsAttentionSinceLabel}',
+                          style: AppType.caption.copyWith(
+                            color: AppColors.warningText,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  DesignStatusBadge(
-                    label: 'Perhatian',
-                    style: AppStatus.warning,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpace.s2,
+                      vertical: AppSpace.s1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.dangerContainer,
+                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                    ),
+                    child: Text(
+                      elapsedLabel,
+                      style: AppType.bodyStrong.copyWith(
+                        color: AppColors.dangerText,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: AppSpace.s2),
             Text(
-              'Perlu pemeriksaan fisik · ${locker.needsAttentionSinceLabel}',
+              'Perlu pemeriksaan fisik. Segera cek kondisi pintu.',
               style: AppType.caption.copyWith(color: AppColors.neutralTextBody),
             ),
             const SizedBox(height: AppSpace.s3),
@@ -641,6 +714,10 @@ class _AttentionCard extends StatelessWidget {
               width: double.infinity,
               child: FilledButton(
                 onPressed: onHandle,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.warningMain,
+                  foregroundColor: AppColors.neutralOnInverse,
+                ),
                 child: const Text('Tangani sekarang'),
               ),
             ),

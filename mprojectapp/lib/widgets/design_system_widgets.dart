@@ -48,6 +48,9 @@ class DesignMetricCard extends StatelessWidget {
     required this.value,
     required this.style,
     this.highlighted = false,
+    this.supportingText,
+    this.valueColor,
+    this.valueOnTop = false,
     super.key,
   });
 
@@ -55,9 +58,27 @@ class DesignMetricCard extends StatelessWidget {
   final String value;
   final StatusStyle style;
   final bool highlighted;
+  final String? supportingText;
+  final Color? valueColor;
+  final bool valueOnTop;
 
   @override
   Widget build(BuildContext context) {
+    final labelWidget = Text(
+      label,
+      style: AppType.caption.copyWith(
+        color: highlighted ? style.text : AppColors.neutralTextMuted,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+    final valueWidget = Text(
+      value,
+      style: AppType.headline.copyWith(color: valueColor ?? style.main),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+
     return Container(
       padding: const EdgeInsets.all(AppSpace.s4),
       decoration: BoxDecoration(
@@ -71,14 +92,21 @@ class DesignMetricCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(value, style: AppType.headline.copyWith(color: style.main)),
+          if (valueOnTop) valueWidget else labelWidget,
           const SizedBox(height: AppSpace.s1),
-          Text(
-            label,
-            style: AppType.caption.copyWith(
-              color: highlighted ? style.text : AppColors.neutralTextMuted,
+          if (valueOnTop) labelWidget else valueWidget,
+          if (supportingText != null) ...[
+            const SizedBox(height: AppSpace.s1),
+            Text(
+              supportingText!,
+              style: AppType.micro.copyWith(
+                color: highlighted ? style.text : AppColors.neutralTextMuted,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -212,6 +240,29 @@ class LockerSummaryCard extends StatelessWidget {
                   ],
                 ),
               ],
+              const SizedBox(height: AppSpace.s2),
+              const Divider(height: 1),
+              const SizedBox(height: AppSpace.s2),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.sensors_outlined,
+                    size: 14,
+                    color: AppColors.neutralTextMuted,
+                  ),
+                  const SizedBox(width: AppSpace.s2),
+                  Expanded(
+                    child: Text(
+                      'Status ESP32 belum tersedia dari API',
+                      style: AppType.caption.copyWith(
+                        color: AppColors.neutralTextMuted,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),

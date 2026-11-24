@@ -1,5 +1,9 @@
 \# Dokumentasi Setup Flutter \& Android Toolchain
 
+Untuk cakupan implementasi tampilan Petugas/Admin terhadap mockup, batasan data
+API, dan cara memverifikasi APK setelah perubahan UI, lihat
+[Dokumentasi Redesain UI Flutter](./REDESAIN_UI_FLUTTER.md).
+
 
 
 Catatan lengkap proses troubleshooting `flutter doctor` sampai berhasil, plus cara membuat project baru dengan package name custom.

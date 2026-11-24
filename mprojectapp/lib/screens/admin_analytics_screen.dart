@@ -48,7 +48,7 @@ class AdminAnalyticsScreen extends StatelessWidget {
           children: [
             Text(title, style: AppType.title),
             Text(
-              'Admin',
+              'Admin · ${lockers.length} locker',
               style: AppType.caption.copyWith(
                 color: AppColors.neutralTextMuted,
               ),
@@ -56,6 +56,18 @@ class AdminAnalyticsScreen extends StatelessWidget {
           ],
         ),
         actions: [
+          if (!showLockerListOnly && MediaQuery.sizeOf(context).width >= 768)
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpace.s2),
+              child: Center(
+                child: Text(
+                  'Status ESP32 belum tersedia',
+                  style: AppType.caption.copyWith(
+                    color: AppColors.neutralTextMuted,
+                  ),
+                ),
+              ),
+            ),
           IconButton(
             onPressed: onRefresh,
             icon: const Icon(Icons.refresh),
@@ -88,11 +100,18 @@ class AdminAnalyticsScreen extends StatelessWidget {
                   constraints: const BoxConstraints(
                     maxWidth: AppSize.contentMax,
                   ),
-                  child: ListView(
-                    padding: const EdgeInsets.all(AppSpace.s4),
-                    children: showLockerListOnly
-                        ? _lockerPage(context)
-                        : _summaryPage(context),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final useWebLayout = constraints.maxWidth >= 768;
+                      return ListView(
+                        padding: const EdgeInsets.all(AppSpace.s4),
+                        children: showLockerListOnly
+                            ? _lockerPage(context)
+                            : useWebLayout
+                            ? _webSummaryPage(context)
+                            : _summaryPage(context),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -104,54 +123,32 @@ class AdminAnalyticsScreen extends StatelessWidget {
     final activeCount = rentals
         .where((rental) => rental.endedAt == null)
         .length;
-    final attentionCount = _count(LockerStatus.needsAttention);
+    final attentionLockers = lockers
+        .where((locker) => locker.status == LockerStatus.needsAttention)
+        .toList();
+    final attentionLocker = attentionLockers.isEmpty
+        ? null
+        : attentionLockers.first;
 
     return [
-      if (attentionCount > 0) ...[
-        _AttentionBanner(count: attentionCount),
+      if (attentionLocker != null) ...[
+        _AttentionBanner(
+          count: attentionLockers.length,
+          locker: attentionLocker,
+          onTap: () => _showLockerDetails(context, attentionLocker),
+          expanded: false,
+        ),
         const SizedBox(height: AppSpace.s4),
       ],
-      LayoutBuilder(
-        builder: (context, constraints) {
-          final columns = constraints.maxWidth >= 900 ? 4 : 2;
-          final cardHeight = constraints.maxWidth >= 900 ? 104.0 : 88.0;
-          return GridView(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: columns,
-              mainAxisExtent: cardHeight,
-              mainAxisSpacing: AppSpace.s2,
-              crossAxisSpacing: AppSpace.s2,
-            ),
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            children: [
-              DesignMetricCard(
-                label: 'Total sewa',
-                value: '${stats?.totalRentals ?? rentals.length}',
-                style: AppStatus.info,
-              ),
-              DesignMetricCard(
-                label: 'Rata-rata durasi',
-                value: stats?.displayAvgDuration ?? '-',
-                style: AppStatus.success,
-              ),
-              DesignMetricCard(
-                label: 'Perhatian',
-                value: '$attentionCount',
-                style: AppStatus.warning,
-                highlighted: attentionCount > 0,
-              ),
-              DesignMetricCard(
-                label: 'Sedang berjalan',
-                value: '$activeCount',
-                style: AppStatus.info,
-              ),
-            ],
-          );
-        },
-      ),
+      _metricsGrid(columns: 2),
       const SizedBox(height: AppSpace.s6),
-      const DesignSectionHeader(title: 'Status locker'),
+      DesignSectionHeader(
+        title: 'Status locker',
+        trailing: DesignStatusBadge(
+          label: '$activeCount sesi aktif',
+          style: AppStatus.info,
+        ),
+      ),
       const SizedBox(height: AppSpace.s2),
       if (lockers.isEmpty && loading)
         const Center(
@@ -177,10 +174,145 @@ class AdminAnalyticsScreen extends StatelessWidget {
       const SizedBox(height: AppSpace.s4),
       const _DataAvailabilityCard(
         title: 'Aktivitas terbaru',
-        message:
-            'Log kejadian dan data pemakaian per jam belum disediakan oleh API.',
+        message: 'Log kejadian belum disediakan oleh API.',
       ),
     ];
+  }
+
+  List<Widget> _webSummaryPage(BuildContext context) {
+    final attentionLockers = lockers
+        .where((locker) => locker.status == LockerStatus.needsAttention)
+        .toList();
+    final attentionLocker = attentionLockers.isEmpty
+        ? null
+        : attentionLockers.first;
+
+    return [
+      if (attentionLocker != null) ...[
+        _AttentionBanner(
+          count: attentionLockers.length,
+          locker: attentionLocker,
+          onTap: () => _showLockerDetails(context, attentionLocker),
+          expanded: true,
+        ),
+        const SizedBox(height: AppSpace.s4),
+      ],
+      _metricsGrid(columns: 4),
+      const SizedBox(height: AppSpace.s6),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 7,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DesignSectionHeader(
+                  title: 'Status locker',
+                  trailing: DesignStatusBadge(
+                    label:
+                        '${rentals.where((rental) => rental.endedAt == null).length} sesi aktif',
+                    style: AppStatus.info,
+                  ),
+                ),
+                const SizedBox(height: AppSpace.s2),
+                if (lockers.isEmpty && loading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(AppSpace.s8),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else if (lockers.isEmpty)
+                  const DesignEmptyState(
+                    icon: Icons.inventory_2_outlined,
+                    title: 'Belum ada locker',
+                    message:
+                        'Data locker akan muncul di sini setelah tersedia.',
+                  )
+                else
+                  GridView.builder(
+                    itemCount: lockers.length,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisExtent: 220,
+                          crossAxisSpacing: AppSpace.s2,
+                          mainAxisSpacing: AppSpace.s2,
+                        ),
+                    itemBuilder: (context, index) {
+                      final locker = lockers[index];
+                      return _AdminWebLockerCard(
+                        locker: locker,
+                        tenantName: _tenantFor(locker),
+                        onTap: () => _showLockerDetails(context, locker),
+                      );
+                    },
+                  ),
+                const SizedBox(height: AppSpace.s4),
+                const _UsageUnavailableCard(),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpace.s4),
+          const Expanded(flex: 5, child: _EventsUnavailablePanel()),
+        ],
+      ),
+    ];
+  }
+
+  Widget _metricsGrid({required int columns}) {
+    final attentionCount = _count(LockerStatus.needsAttention);
+    final now = DateTime.now();
+    final todayRentalCount = rentals.where((rental) {
+      final startedAt = rental.startedAt.toLocal();
+      return startedAt.year == now.year &&
+          startedAt.month == now.month &&
+          startedAt.day == now.day;
+    }).length;
+
+    return GridView(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: columns,
+        mainAxisExtent: 108,
+        mainAxisSpacing: AppSpace.s2,
+        crossAxisSpacing: AppSpace.s2,
+      ),
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      children: [
+        DesignMetricCard(
+          label: 'Sewa hari ini',
+          value: loading && rentals.isEmpty ? '—' : '$todayRentalCount',
+          style: AppStatus.info,
+          valueColor: AppColors.neutralInk,
+          supportingText: 'Sesi dimulai hari ini',
+        ),
+        DesignMetricCard(
+          label: 'Rata-rata durasi',
+          value: stats?.displayAvgDuration ?? '-',
+          style: AppStatus.success,
+          valueColor: AppColors.neutralInk,
+          supportingText: '${stats?.totalRentals ?? rentals.length} sesi',
+        ),
+        DesignMetricCard(
+          label: 'Perhatian',
+          value: '$attentionCount',
+          style: AppStatus.warning,
+          highlighted: attentionCount > 0,
+          supportingText: 'Locker perlu diperiksa',
+        ),
+        DesignMetricCard(
+          label: 'Buka darurat',
+          value: '—',
+          style: AppStatus.danger,
+          valueColor: AppColors.dangerMain,
+          supportingText: 'Log audit belum tersedia',
+        ),
+      ],
+    );
   }
 
   List<Widget> _lockerPage(BuildContext context) {
@@ -267,41 +399,290 @@ class AdminAnalyticsScreen extends StatelessWidget {
 }
 
 class _AttentionBanner extends StatelessWidget {
-  const _AttentionBanner({required this.count});
+  const _AttentionBanner({
+    required this.count,
+    required this.locker,
+    required this.onTap,
+    required this.expanded,
+  });
 
   final int count;
+  final Locker locker;
+  final VoidCallback onTap;
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(AppSpace.s4),
       decoration: BoxDecoration(
         color: AppStatus.warning.tint,
         borderRadius: BorderRadius.circular(AppRadius.card),
         border: Border.all(color: AppStatus.warning.border),
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.warning_amber_rounded, color: AppColors.warningMain),
-          const SizedBox(width: AppSpace.s3),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpace.s4),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: AppColors.warningContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  color: AppColors.warningMain,
+                ),
+              ),
+              const SizedBox(width: AppSpace.s3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${locker.lockerId} · pintu terbuka ${locker.displayDuration}',
+                      style: AppType.bodyStrong,
+                    ),
+                    Text(
+                      '$count locker perlu perhatian · status ESP32 belum tersedia dari API',
+                      style: AppType.caption.copyWith(
+                        color: AppColors.neutralTextMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (expanded) ...[
+                const SizedBox(width: AppSpace.s3),
+                FilledButton(
+                  onPressed: onTap,
+                  child: const Text('Lihat detail'),
+                ),
+              ] else
+                const Icon(
+                  Icons.chevron_right,
+                  color: AppColors.neutralTextMuted,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AdminWebLockerCard extends StatelessWidget {
+  const _AdminWebLockerCard({
+    required this.locker,
+    required this.tenantName,
+    required this.onTap,
+  });
+
+  final Locker locker;
+  final String? tenantName;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = lockerStatusStyle(locker.status);
+    final attention = locker.status == LockerStatus.needsAttention;
+    final occupied = locker.status == LockerStatus.occupied;
+    final number = locker.lockerId.replaceAll(RegExp(r'[^0-9]'), '');
+    final metric = occupied
+        ? locker.displayDuration
+        : attention
+        ? locker.displayDuration
+        : 'Siap';
+
+    return Card(
+      color: attention ? style.tint : AppColors.neutralSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        side: BorderSide(
+          color: attention ? style.border : AppColors.neutralBorder,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpace.s4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: style.container,
+                    child: Text(
+                      number,
+                      style: AppType.bodyStrong.copyWith(color: style.main),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpace.s2),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(locker.lockerId, style: AppType.bodyStrong),
+                        Text(
+                          occupied
+                              ? tenantName ?? 'Penyewa tidak tersedia'
+                              : attention
+                              ? 'Tidak ada penyewa aktif'
+                              : 'Siap disewa',
+                          style: AppType.caption.copyWith(
+                            color: AppColors.neutralTextMuted,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpace.s1),
+                  DesignStatusBadge(
+                    label: lockerStatusLabel(locker.status),
+                    style: style,
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpace.s3),
+              Text(
+                metric,
+                style: AppType.headline.copyWith(
+                  color: attention
+                      ? AppColors.dangerMain
+                      : occupied
+                      ? AppColors.infoMain
+                      : AppColors.successMain,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                attention
+                    ? 'pintu terbuka'
+                    : occupied
+                    ? 'durasi sewa'
+                    : 'status locker',
+                style: AppType.caption.copyWith(
+                  color: AppColors.neutralTextMuted,
+                ),
+              ),
+              const Spacer(),
+              const Divider(height: AppSpace.s3),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.sensors_outlined,
+                    size: 14,
+                    color: AppColors.neutralTextMuted,
+                  ),
+                  const SizedBox(width: AppSpace.s1),
+                  Expanded(
+                    child: Text(
+                      'Status ESP32 belum tersedia',
+                      style: AppType.micro.copyWith(
+                        color: AppColors.neutralTextMuted,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: onTap,
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(44, AppSize.touchMin),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpace.s2,
+                      ),
+                    ),
+                    child: const Text('Detail'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EventsUnavailablePanel extends StatelessWidget {
+  const _EventsUnavailablePanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const DesignSectionHeader(title: 'Kejadian terbaru'),
+        const SizedBox(height: AppSpace.s2),
+        Card(
+          child: SizedBox(
+            height: 414,
+            width: double.infinity,
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpace.s4),
+              child: const DesignEmptyState(
+                icon: Icons.event_note_outlined,
+                title: 'Log kejadian belum tersedia',
+                message:
+                    'Server belum menyediakan endpoint aktivitas dan audit. Data contoh tidak ditampilkan.',
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _UsageUnavailableCard extends StatelessWidget {
+  const _UsageUnavailableCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpace.s4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Text(
-                  '$count locker perlu perhatian',
-                  style: AppType.bodyStrong,
+                Expanded(
+                  child: Text('Pemakaian per jam', style: AppType.subtitle),
                 ),
                 Text(
-                  'Periksa status locker dan koordinasikan dengan Petugas.',
+                  '7 hari terakhir',
                   style: AppType.caption.copyWith(
                     color: AppColors.neutralTextMuted,
                   ),
                 ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpace.s4),
+            SizedBox(
+              height: 200,
+              child: DesignEmptyState(
+                icon: Icons.bar_chart_outlined,
+                title: 'Grafik belum tersedia',
+                message:
+                    'API belum menyediakan agregasi sewa per jam atau per hari.',
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

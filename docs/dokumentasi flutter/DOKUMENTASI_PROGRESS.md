@@ -162,9 +162,11 @@ mprojectapp/lib/
 
 ### UI/UX
 
-- ✅ Durasi adaptif ("5h 8j" untuk rental panjang)
-- ✅ Warna status konsisten (hijau/oranye/merah)
-- ✅ Material Design 3, loading state, empty state, error state
+- ✅ Tema token untuk warna, tipografi Inter, radius, spasi, dan breakpoint responsif
+- ✅ Tampilan Petugas dan Admin mengikuti struktur mockup mobile/web yang datanya tersedia
+- ✅ Status locker dibedakan dengan warna dan label; data perangkat/aktivitas yang belum ada ditandai jelas
+- ⚠️ Audit, konektivitas ESP32, dan aksi buka darurat memerlukan dukungan API sebelum bisa aktif
+- Detail cakupan UI dan batasan integrasi: `docs/dokumentasi flutter/REDESAIN_UI_FLUTTER.md`
 
 ---
 
@@ -198,7 +200,8 @@ mprojectapp/lib/
 - [x] `firebase_options.dart` ada
 - [x] Login via Express (JWT + bcrypt)
 - [x] Dashboard petugas (polling 10 detik, resolve)
-- [x] Dashboard admin (2 tab: Analitik + Riwayat)
+- [x] Dashboard Admin responsif (Ringkasan, Riwayat, Log Audit, dan Menu)
+- [x] Redesain UI Flutter berbasis design tokens dan mockup SVG
 - [x] Statistik admin & riwayat rentals dengan filter
 - [x] Durasi adaptif (`duration_formatter.dart`)
 - [x] Auto-refresh saat app resume & FCM lengkap (foreground, background, terminated)
@@ -311,6 +314,7 @@ Log backend yang diharapkan: `[fcm] locker_01 (initial): sent=3, failed=0`, `[fc
 | `docs/API.md`                              | Kontrak resmi endpoint                               |
 | `docs/DOKUMENTASI_TESTING_FCM.md`          | Testing FCM end-to-end                               |
 | `docs/DESAIN_NOTIFIKASI.md`                | Desain notifikasi (tingkat, channel, reminder)       |
+| `docs/dokumentasi flutter/REDESAIN_UI_FLUTTER.md` | Cakupan redesain Flutter dan batasan API        |
 | `firmware/DOKUMENTASI_PROGRESS_BACKEND.md` | Progress backend (Galuh)                             |
 
 ---

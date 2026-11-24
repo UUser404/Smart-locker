@@ -2,10 +2,131 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mprojectapp/models/locker.dart';
 import 'package:mprojectapp/models/rental_record.dart';
+import 'package:mprojectapp/screens/admin_analytics_screen.dart';
 import 'package:mprojectapp/screens/admin_history_screen.dart';
 import 'package:mprojectapp/screens/petugas_locker_screens.dart';
+import 'package:mprojectapp/widgets/design_system_widgets.dart';
 
 void main() {
+  testWidgets('locker card marks unavailable ESP32 status without guessing', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ListView(
+            children: [
+              LockerSummaryCard(
+                locker: Locker(
+                  lockerId: 'locker_01',
+                  status: LockerStatus.occupied,
+                ),
+                onTap: () {},
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Status ESP32 belum tersedia dari API'), findsOneWidget);
+    expect(find.text('Online'), findsNothing);
+  });
+
+  testWidgets('admin summary shows emergency data as unavailable', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AdminAnalyticsScreen(
+          stats: RentalStats(totalRentals: 1, avgDurationSeconds: 0),
+          rentals: [
+            RentalRecord(
+              rentalId: 'R-001',
+              lockerId: 'locker_01',
+              nama: 'Budi Santoso',
+              noHp: '0812****7890',
+              startedAt: DateTime.now(),
+            ),
+          ],
+          lockers: const [],
+          loading: false,
+          error: null,
+          onRefresh: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sewa hari ini'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is DesignMetricCard &&
+            widget.label == 'Sewa hari ini' &&
+            widget.value == '1',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Buka darurat'), findsOneWidget);
+    expect(find.text('Log audit belum tersedia'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('admin desktop summary includes event and usage panels', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AdminAnalyticsScreen(
+          stats: RentalStats(totalRentals: 1, avgDurationSeconds: 684),
+          rentals: [
+            RentalRecord(
+              rentalId: 'R-001',
+              lockerId: 'locker_01',
+              nama: 'Budi Santoso',
+              noHp: '0812****7890',
+              startedAt: DateTime.now(),
+            ),
+          ],
+          lockers: [
+            Locker(
+              lockerId: 'locker_01',
+              status: LockerStatus.occupied,
+              elapsedSeconds: 684,
+            ),
+            Locker(
+              lockerId: 'locker_02',
+              status: LockerStatus.needsAttention,
+              unlockedSince: DateTime.now().subtract(
+                const Duration(minutes: 6, seconds: 12),
+              ),
+            ),
+          ],
+          loading: false,
+          error: null,
+          onRefresh: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Kejadian terbaru'), findsOneWidget);
+    expect(find.text('Pemakaian per jam'), findsOneWidget);
+    expect(find.text('Grafik belum tersedia'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('resolve stays disabled until both physical checks are marked', (
     tester,
   ) async {
