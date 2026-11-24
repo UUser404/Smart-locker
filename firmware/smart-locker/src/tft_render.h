@@ -7,10 +7,9 @@
 void tft_init();
 
 // Render QR code untuk locker idx
-// - lockerId: contoh "locker_01"
-// - token: contoh "9f3a1c" (dari backend)
-// Format QR yang dirender: "{lockerId}.{token}"
-void tft_render_qr(int idx, const char *lockerId, const char *token);
+// - url: string URL utuh dari backend (contoh:
+// "https://www.locker-qu.com/locker_01?token=9f3a1c")
+void tft_render_qr(int idx, const char *url);
 
 // Tampilkan pesan teks (untuk status: "Locker tidak dapat dipakai" dll)
 void tft_render_message(int idx, const char *line1, const char *line2);

@@ -33,8 +33,7 @@ int nextTftToRender = 0;
 // ============================================================
 // SETUP
 // ============================================================
-void setup()
-{
+void setup() {
   Serial.begin(115200);
   delay(1000);
 
@@ -55,8 +54,7 @@ void setup()
   Serial.print("[Sys] MAC Address: ");
   Serial.println(wifi_get_mac());
 
-  if (!wifi_init())
-  {
+  if (!wifi_init()) {
     Serial.println("[Sys] WiFi gagal. Restart...");
     delay(3000);
     ESP.restart();
@@ -76,8 +74,7 @@ void setup()
   esp_task_wdt_add(NULL);
   Serial.printf("[Sys] Watchdog aktif: %d detik\n", WDT_TIMEOUT_SEC);
 
-  for (int i = 0; i < NUM_LOCKERS; i++)
-  {
+  for (int i = 0; i < NUM_LOCKERS; i++) {
     lastRenderedToken[i] = "";
     lastDrawnToken[i] = "";
     waitingForClose[i] = false;
@@ -89,29 +86,26 @@ void setup()
 // ============================================================
 // LOOP
 // ============================================================
-void loop()
-{
+void loop() {
   // Reset watchdog setiap loop
   esp_task_wdt_reset();
 
   // ============================================================
   // Auto-lock: jalan tiap loop, tidak menunggu interval sync / WiFi.
-  // Kunci lagi kalau (a) pintu sudah terbuka lalu tertutup (debounced),
-  // atau (b) UNLOCK_HOLD_MS habis (pintu tidak dibuka / terlalu lama).
   // ============================================================
-  for (int i = 0; i < ACTIVE_LOCKERS; i++)
-  {
+  for (int i = 0; i < ACTIVE_LOCKERS; i++) {
 #if ENABLE_DOOR_SENSOR
-    int t = door_check_transition(i); // harus dipanggil tiap loop untuk debounce
+    int t =
+        door_check_transition(i); // harus dipanggil tiap loop untuk debounce
 #else
     int t = 0;
 #endif
     if (t == 1)
       openLatch[i] = true;
-    if (t != 0)
-    {
+    if (t != 0) {
       forceSync = true;
-      Serial.printf("[Door] Locker %d: %s\n", i, t == 1 ? "TERBUKA" : "TERTUTUP");
+      Serial.printf("[Door] Locker %d: %s\n", i,
+                    t == 1 ? "TERBUKA" : "TERTUTUP");
     }
 
     if (!waitingForClose[i])
@@ -121,27 +115,22 @@ void loop()
       doorSeenOpen[i] = true;
 
     bool relock = false;
-    if (t == -1 && doorSeenOpen[i])
-    {
+    if (t == -1 && doorSeenOpen[i]) {
       Serial.printf("[Lock] Locker %d: pintu tertutup -> kunci\n", i);
       relock = true;
-    }
-    else if (millis() - unlockedAtMs[i] >= UNLOCK_HOLD_MS)
-    {
+    } else if (millis() - unlockedAtMs[i] >= UNLOCK_HOLD_MS) {
       Serial.printf("[Lock] Locker %d: batas %d ms habis -> kunci\n", i,
                     UNLOCK_HOLD_MS);
       relock = true;
     }
 
-    if (relock)
-    {
+    if (relock) {
       lock_lock(i);
       waitingForClose[i] = false;
     }
   }
 
-  if (!wifi_check_and_reconnect())
-  {
+  if (!wifi_check_and_reconnect()) {
     delay(3000);
     return;
   }
@@ -160,22 +149,15 @@ void loop()
   bool doorOpen[NUM_LOCKERS] = {false};
   bool solenoidOn[NUM_LOCKERS] = {false};
 
-  for (int i = 0; i < NUM_LOCKERS; i++)
-  {
-    if (i < ACTIVE_LOCKERS)
-    {
+  for (int i = 0; i < NUM_LOCKERS; i++) {
+    if (i < ACTIVE_LOCKERS) {
 #if ENABLE_DOOR_SENSOR
       doorOpen[i] = door_is_open(i) || openLatch[i];
 #else
-      // Dev mode: pin floating, kirim false supaya backend tidak deteksi
-      // transisi palsu
       doorOpen[i] = false;
 #endif
       solenoidOn[i] = lock_is_unlocked(i);
-    }
-    else
-    {
-      // Locker belum di-wire: kirim state default
+    } else {
       doorOpen[i] = false;
       solenoidOn[i] = false;
     }
@@ -188,8 +170,6 @@ void loop()
   if (!sync.success)
     return;
 
-  // Backend sudah menerima door_open=true; sync berikutnya akan melaporkan
-  // kondisi nyata (tertutup), sehingga backend melihat transisi open -> closed.
   for (int i = 0; i < NUM_LOCKERS; i++)
     openLatch[i] = false;
 
@@ -198,24 +178,19 @@ void loop()
   // ============================================================
   // Proses commands
   // ============================================================
-  for (int i = 0; i < NUM_LOCKERS; i++)
-  {
-    if (sync.hasCommand[i])
-    {
-      if (i < ACTIVE_LOCKERS)
-      {
+  for (int i = 0; i < NUM_LOCKERS; i++) {
+    if (sync.hasCommand[i]) {
+      if (i < ACTIVE_LOCKERS) {
         Serial.printf("[Cmd] Locker %d: UNLOCK\n", i);
         lock_open(i);
         waitingForClose[i] = true;
         unlockedAtMs[i] = millis();
 #if ENABLE_DOOR_SENSOR
-        doorSeenOpen[i] = door_is_open(i); // kalau sudah terbuka, tunggu tutup
+        doorSeenOpen[i] = door_is_open(i);
 #else
         doorSeenOpen[i] = false;
 #endif
-      }
-      else
-      {
+      } else {
         Serial.printf("[Cmd] Locker %d: unlock (SKIP - belum di-wire)\n", i);
       }
     }
@@ -224,11 +199,9 @@ void loop()
   // ============================================================
   // Update token terbaru
   // ============================================================
-  for (int i = 0; i < ACTIVE_LOCKERS; i++)
-  {
+  for (int i = 0; i < ACTIVE_LOCKERS; i++) {
     if (sync.qrTokens[i].length() > 0 &&
-        sync.qrTokens[i] != lastRenderedToken[i])
-    {
+        sync.qrTokens[i] != lastRenderedToken[i]) {
       Serial.printf("[QR] Locker %d token: %s\n", i, sync.qrTokens[i].c_str());
       lastRenderedToken[i] = sync.qrTokens[i];
     }
@@ -237,14 +210,12 @@ void loop()
 #if ENABLE_TFT
   // Gambar ulang HANYA kalau token berubah (hindari flicker),
   // maksimal 1 TFT per siklus sync supaya loop tidak lama terblokir.
-  for (int n = 0; n < ACTIVE_LOCKERS; n++)
-  {
+  for (int n = 0; n < ACTIVE_LOCKERS; n++) {
     int idx = (nextTftToRender + n) % ACTIVE_LOCKERS;
     if (lastRenderedToken[idx].length() > 0 &&
-        lastRenderedToken[idx] != lastDrawnToken[idx])
-    {
-      String lockerId = "locker_0" + String(idx + 1);
-      tft_render_qr(idx, lockerId.c_str(), lastRenderedToken[idx].c_str());
+        lastRenderedToken[idx] != lastDrawnToken[idx]) {
+      // 🔥 LANGSUNG PASSING URL DARI BACKEND
+      tft_render_qr(idx, lastRenderedToken[idx].c_str());
       lastDrawnToken[idx] = lastRenderedToken[idx];
       nextTftToRender = (idx + 1) % ACTIVE_LOCKERS;
       break;

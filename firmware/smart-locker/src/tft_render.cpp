@@ -22,8 +22,7 @@
 
 static Adafruit_ST7789 *tft[NUM_LOCKERS] = {nullptr};
 
-void tft_init()
-{
+void tft_init() {
   // Setup backlight
   pinMode(TFT_BLK_PIN, OUTPUT);
   digitalWrite(TFT_BLK_PIN, HIGH);
@@ -32,8 +31,7 @@ void tft_init()
   // Inisialisasi hardware SPI
   SPI.begin(TFT_SCLK_PIN, -1, TFT_MOSI_PIN, -1);
 
-  for (int i = 0; i < ACTIVE_LOCKERS; i++)
-  {
+  for (int i = 0; i < ACTIVE_LOCKERS; i++) {
     tft[i] = new Adafruit_ST7789(TFT_CS_PINS[i], TFT_DC_PINS[i], TFT_RST_PIN);
 
     // Modul tanpa pin CS terbukti hanya merespons di SPI mode 3
@@ -46,32 +44,28 @@ void tft_init()
   }
 }
 
-void tft_clear(int idx)
-{
+void tft_clear(int idx) {
   if (idx < 0 || idx >= ACTIVE_LOCKERS || tft[idx] == nullptr)
     return;
   tft[idx]->fillScreen(TFT_BG_COLOR);
 }
 
-void tft_render_qr(int idx, const char *lockerId, const char *token)
-{
-  if (idx < 0 || idx >= ACTIVE_LOCKERS || tft[idx] == nullptr)
-  {
+void tft_render_qr(int idx, const char *url) {
+  if (idx < 0 || idx >= ACTIVE_LOCKERS || tft[idx] == nullptr) {
     Serial.printf("[TFT] render_qr dibatalkan: idx=%d tft=%s\n", idx,
                   (idx >= 0 && idx < NUM_LOCKERS && tft[idx]) ? "ada" : "null");
     return;
   }
 
-  // Bangun string QR: "locker_01.9f3a1c"
-  String qrText = String(lockerId) + "." + String(token);
-  Serial.printf("[TFT] Locker %d render QR: %s (panjang=%d)\n", idx,
-                qrText.c_str(), (int)qrText.length());
+  // LANGSUNG PAKAI URL DARI BACKEND
+  Serial.printf("[TFT] Locker %d render QR URL: %s (panjang=%d)\n", idx, url,
+                (int)strlen(url));
 
   // Generate QR matrix
   QRCode qrcode;
   uint8_t qrcodeData[qrcode_getBufferSize(QR_VERSION)];
-  int8_t rc = qrcode_initText(&qrcode, qrcodeData, QR_VERSION, QR_ECC_LEVEL,
-                              qrText.c_str());
+  int8_t rc =
+      qrcode_initText(&qrcode, qrcodeData, QR_VERSION, QR_ECC_LEVEL, url);
 
 #if TFT_DIAG
   Serial.printf("[TFT] qr rc=%d versi=%d size=%d buffer=%d byte\n", rc,
@@ -81,8 +75,7 @@ void tft_render_qr(int idx, const char *lockerId, const char *token)
                 (unsigned)uxTaskGetStackHighWaterMark(NULL));
 #endif
 
-  if (rc != 0)
-  {
+  if (rc != 0) {
     Serial.println("[TFT] ERROR: pembuatan QR gagal, penggambaran dibatalkan");
     tft_render_message(idx, "QR GAGAL", "rc != 0");
     return;
@@ -104,12 +97,10 @@ void tft_render_qr(int idx, const char *lockerId, const char *token)
 
   // Dump QR sebagai ASCII + hitung modul gelap
   int dark = 0;
-  for (uint8_t y = 0; y < qrcode.size; y++)
-  {
+  for (uint8_t y = 0; y < qrcode.size; y++) {
     String row;
     row.reserve(qrcode.size * 2 + 1);
-    for (uint8_t x = 0; x < qrcode.size; x++)
-    {
+    for (uint8_t x = 0; x < qrcode.size; x++) {
       bool m = qrcode_getModule(&qrcode, x, y);
       if (m)
         dark++;
@@ -139,13 +130,9 @@ void tft_render_qr(int idx, const char *lockerId, const char *token)
 #endif
 
   // Gambar hanya modul gelap.
-  // Tanpa startWrite()/endWrite() di luar: fillRect sudah mengatur transaksi
-  // SPI sendiri (sama seperti penanda sudut yang terbukti tampil).
   int drawn = 0;
-  for (uint8_t y = 0; y < qrcode.size; y++)
-  {
-    for (uint8_t x = 0; x < qrcode.size; x++)
-    {
+  for (uint8_t y = 0; y < qrcode.size; y++) {
+    for (uint8_t x = 0; x < qrcode.size; x++) {
       if (!qrcode_getModule(&qrcode, x, y))
         continue;
       int px = offsetX + (x + QR_QUIET_ZONE) * moduleSize;
@@ -159,8 +146,7 @@ void tft_render_qr(int idx, const char *lockerId, const char *token)
                 millis() - t0);
 }
 
-void tft_render_message(int idx, const char *line1, const char *line2)
-{
+void tft_render_message(int idx, const char *line1, const char *line2) {
   if (idx < 0 || idx >= ACTIVE_LOCKERS || tft[idx] == nullptr)
     return;
 

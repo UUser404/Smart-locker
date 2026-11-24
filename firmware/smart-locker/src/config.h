@@ -64,7 +64,7 @@ const int TFT_DC_PINS[NUM_LOCKERS] = {16, 17, 21, 22};
 #define TFT_WIDTH 240
 #define TFT_HEIGHT 240
 
-#define QR_VERSION 2
+#define QR_VERSION 6
 #define QR_ECC_LEVEL ECC_LOW
 #define QR_SIZE_PX 240
 #define QR_QUIET_ZONE 2
