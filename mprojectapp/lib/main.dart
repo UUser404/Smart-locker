@@ -9,6 +9,7 @@ import 'services/fcm_service.dart';
 import 'screens/admin_home_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/login_screen.dart';
+import 'theme/app_theme.dart';
 
 // Dihasilkan otomatis oleh `flutterfire configure`.
 // Jalankan perintah itu dulu supaya file ini ada sebelum build.
@@ -83,7 +84,7 @@ class SmartLockerStaffApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Smart Locker - Petugas',
-      theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
+      theme: buildAppTheme(),
       home: const _StartupGate(),
     );
   }

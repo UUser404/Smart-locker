@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+
 import '../models/locker.dart';
 import '../models/rental_record.dart';
 import '../models/session.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/fcm_service.dart';
+import '../theme/app_theme.dart';
+import '../theme/app_tokens.dart';
+import '../widgets/design_system_widgets.dart';
 import 'admin_analytics_screen.dart';
+import 'admin_audit_screen.dart';
 import 'admin_history_screen.dart';
 import 'login_screen.dart';
 
@@ -23,58 +28,52 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   late final ApiService _api;
   late final AuthService _authService;
 
-  int _selectedIndex = 0;
-
+  int _mobileIndex = 0;
+  int _webIndex = 0;
   RentalStats? _stats;
   List<RentalRecord> _rentals = [];
   List<Locker> _lockers = [];
   bool _loading = true;
   String? _error;
-
-  // Track state agar tidak refresh saat app masih loading/error
   DateTime? _lastFetch;
   bool _handlingExpiredSession = false;
+
+  static const _webDestinations = [
+    _AdminDestination(Icons.dashboard_outlined, 'Ringkasan'),
+    _AdminDestination(Icons.grid_view_outlined, 'Locker & Perangkat'),
+    _AdminDestination(Icons.receipt_long_outlined, 'Riwayat Sewa'),
+    _AdminDestination(Icons.shield_outlined, 'Log Audit'),
+    _AdminDestination(Icons.groups_outlined, 'Petugas'),
+    _AdminDestination(Icons.settings_outlined, 'Pengaturan'),
+  ];
 
   @override
   void initState() {
     super.initState();
-
-    // ⬇️ Register lifecycle observer
     WidgetsBinding.instance.addObserver(this);
-
-    _api = ApiService();
-    _api.setToken(widget.session.token);
+    _api = ApiService()..setToken(widget.session.token);
     _authService = AuthService(_api);
     _loadReports();
   }
 
   @override
   void dispose() {
-    // ⬇️ WAJIB unregister
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  /// Dipanggil setiap kali app berubah lifecycle state
-  /// (foreground/background/inactive/paused)
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // App kembali ke foreground
-      // Refresh hanya kalau data terakhir fetch > 30 detik yang lalu
-      // (biar tidak spam kalau user cepat buka-tutup app)
       final now = DateTime.now();
       if (_lastFetch == null || now.difference(_lastFetch!).inSeconds > 30) {
-        debugPrint('[AdminHome] App resumed → auto-refresh');
         _loadReports(silent: true);
-      } else {
-        debugPrint('[AdminHome] App resumed → skip refresh (data masih fresh)');
       }
     }
   }
 
   Future<void> _loadReports({bool silent = false}) async {
-    if (!silent) {
+    if (!silent && mounted) {
       setState(() {
         _loading = true;
         _error = null;
@@ -86,17 +85,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
         _api.fetchLockers(),
         _api.fetchRentalReports(),
       ]);
-
       final lockers = results[0] as List<Locker>;
       final (stats, rentals) = results[1] as (RentalStats, List<RentalRecord>);
-
       if (!mounted) return;
       setState(() {
         _lockers = lockers;
         _stats = stats;
         _rentals = rentals;
         _loading = false;
-        _lastFetch = DateTime.now(); // ⬅️ Catat waktu fetch
+        _error = null;
+        _lastFetch = DateTime.now();
       });
     } catch (e) {
       if (!mounted) return;
@@ -106,7 +104,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
       }
       setState(() {
         _loading = false;
-        if (!silent) _error = 'Gagal memuat laporan: $e';
+        if (!silent) _error = 'Gagal memuat data: $e';
       });
     }
   }
@@ -114,7 +112,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   Future<void> _handleExpiredSession() async {
     if (_handlingExpiredSession) return;
     _handlingExpiredSession = true;
-
     await _authService.logout();
     if (!mounted) return;
 
@@ -134,120 +131,318 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   Future<void> _logout() async {
     await _authService.logout();
     if (!mounted) return;
+    final loginApi = ApiService();
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (_) => LoginScreen(
-          authService: AuthService(ApiService()),
-          fcmService: FcmService(ApiService()),
+          authService: AuthService(loginApi),
+          fcmService: FcmService(loginApi),
         ),
       ),
       (route) => false,
     );
   }
 
+  Widget _selectedWebPage() {
+    return switch (_webIndex) {
+      0 => _buildSummary(),
+      1 => _buildLockerPage(),
+      2 => _buildHistory(),
+      3 => _buildAudit(),
+      4 => const _UnavailableAdminPage(
+        title: 'Manajemen Petugas',
+        message: 'Data petugas dan pengelolaannya belum tersedia di API.',
+      ),
+      _ => _buildAccountPage(),
+    };
+  }
+
+  Widget _selectedMobilePage() {
+    return switch (_mobileIndex) {
+      0 => _buildSummary(),
+      1 => _buildHistory(),
+      2 => _buildAudit(),
+      _ => _buildAccountPage(),
+    };
+  }
+
+  Widget _buildSummary() => AdminAnalyticsScreen(
+    stats: _stats,
+    rentals: _rentals,
+    lockers: _lockers,
+    loading: _loading,
+    error: _error,
+    onRefresh: _loadReports,
+  );
+
+  Widget _buildLockerPage() => AdminAnalyticsScreen(
+    stats: _stats,
+    rentals: _rentals,
+    lockers: _lockers,
+    loading: _loading,
+    error: _error,
+    onRefresh: _loadReports,
+    showLockerListOnly: true,
+  );
+
+  Widget _buildHistory() =>
+      AdminHistoryScreen(rentals: _rentals, onRefresh: _loadReports);
+
+  Widget _buildAudit() => const AdminAuditScreen();
+
+  Widget _buildAccountPage() => _AdminAccountPage(
+    session: widget.session,
+    onLogout: _logout,
+    showSettingsNotice: true,
+  );
+
   @override
   Widget build(BuildContext context) {
-    if (_loading && _rentals.isEmpty && _error == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    if (_error != null && _rentals.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Dashboard Admin')),
-        body: ListView(
-          children: [
-            const SizedBox(height: 80),
-            const Icon(Icons.error_outline, color: Colors.red, size: 40),
-            const SizedBox(height: 12),
-            Center(child: Text(_error!)),
-            const SizedBox(height: 24),
-            Center(
-              child: FilledButton.icon(
-                onPressed: _loadReports,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Coba Lagi'),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final pages = [
-      AdminAnalyticsScreen(
-        session: widget.session,
-        stats: _stats,
-        rentals: _rentals,
-        lockers: _lockers,
-        onRefresh: _loadReports,
-        onLogout: _logout,
-      ),
-      AdminHistoryScreen(
-        session: widget.session,
-        rentals: _rentals,
-        onRefresh: _loadReports,
-        onLogout: _logout,
-      ),
-    ];
-
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isWideLayout = constraints.maxWidth >= 600;
-        return Scaffold(
-          body: isWideLayout
-              ? Row(
-                  children: [
-                    NavigationRail(
-                      selectedIndex: _selectedIndex,
-                      labelType: NavigationRailLabelType.all,
-                      onDestinationSelected: (index) {
-                        setState(() => _selectedIndex = index);
-                      },
-                      destinations: const [
-                        NavigationRailDestination(
-                          icon: Icon(Icons.analytics_outlined),
-                          selectedIcon: Icon(Icons.analytics),
-                          label: Text('Analitik'),
-                        ),
-                        NavigationRailDestination(
-                          icon: Icon(Icons.receipt_long_outlined),
-                          selectedIcon: Icon(Icons.receipt_long),
-                          label: Text('Riwayat'),
-                        ),
-                      ],
-                    ),
-                    const VerticalDivider(width: 1),
-                    Expanded(
-                      child: IndexedStack(
-                        index: _selectedIndex,
-                        children: pages,
-                      ),
-                    ),
-                  ],
-                )
-              : IndexedStack(index: _selectedIndex, children: pages),
-          bottomNavigationBar: isWideLayout
-              ? null
-              : NavigationBar(
-                  selectedIndex: _selectedIndex,
-                  onDestinationSelected: (index) {
-                    setState(() => _selectedIndex = index);
-                  },
-                  destinations: const [
-                    NavigationDestination(
-                      icon: Icon(Icons.analytics_outlined),
-                      selectedIcon: Icon(Icons.analytics),
-                      label: 'Analitik',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.receipt_long_outlined),
-                      selectedIcon: Icon(Icons.receipt_long),
-                      label: 'Riwayat',
-                    ),
-                  ],
+        final isExpanded =
+            screenClassOf(constraints.maxWidth) == ScreenClass.expanded;
+        if (isExpanded) {
+          return Scaffold(
+            body: Row(
+              children: [
+                SizedBox(
+                  width: AppSize.sidebar,
+                  child: _AdminSidebar(
+                    selectedIndex: _webIndex,
+                    destinations: _webDestinations,
+                    name: widget.session.nama,
+                    onSelected: (index) => setState(() => _webIndex = index),
+                  ),
                 ),
+                Expanded(child: _selectedWebPage()),
+              ],
+            ),
+          );
+        }
+
+        return Scaffold(
+          body: _selectedMobilePage(),
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: _mobileIndex,
+            onDestinationSelected: (index) =>
+                setState(() => _mobileIndex = index),
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.dashboard_outlined),
+                selectedIcon: Icon(Icons.dashboard),
+                label: 'Ringkasan',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.receipt_long_outlined),
+                selectedIcon: Icon(Icons.receipt_long),
+                label: 'Riwayat',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.shield_outlined),
+                selectedIcon: Icon(Icons.shield),
+                label: 'Log',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.menu),
+                selectedIcon: Icon(Icons.menu_open),
+                label: 'Menu',
+              ),
+            ],
+          ),
         );
       },
+    );
+  }
+}
+
+class _AdminDestination {
+  const _AdminDestination(this.icon, this.label);
+
+  final IconData icon;
+  final String label;
+}
+
+class _AdminSidebar extends StatelessWidget {
+  const _AdminSidebar({
+    required this.selectedIndex,
+    required this.destinations,
+    required this.name,
+    required this.onSelected,
+  });
+
+  final int selectedIndex;
+  final List<_AdminDestination> destinations;
+  final String name;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: AppColors.neutralInverse,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppSpace.s6,
+              AppSpace.s6,
+              AppSpace.s4,
+              AppSpace.s8,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Smart Locker',
+                  style: TextStyle(
+                    color: AppColors.neutralOnInverse,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                SizedBox(height: AppSpace.s1),
+                Text(
+                  'Admin Console',
+                  style: TextStyle(
+                    color: AppColors.neutralOnInverseMuted,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          for (var index = 0; index < destinations.length; index++)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpace.s2,
+                vertical: AppSpace.s1,
+              ),
+              child: ListTile(
+                selected: selectedIndex == index,
+                selectedTileColor: AppColors.brandPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.field),
+                ),
+                leading: Icon(
+                  destinations[index].icon,
+                  color: selectedIndex == index
+                      ? AppColors.neutralOnInverse
+                      : AppColors.neutralOnInverseMuted,
+                ),
+                title: Text(
+                  destinations[index].label,
+                  style: TextStyle(
+                    color: selectedIndex == index
+                        ? AppColors.neutralOnInverse
+                        : AppColors.neutralOnInverseMuted,
+                    fontWeight: selectedIndex == index
+                        ? FontWeight.w800
+                        : FontWeight.w600,
+                  ),
+                ),
+                onTap: () => onSelected(index),
+              ),
+            ),
+          const Spacer(),
+          const Divider(color: AppColors.neutralInverseRaised),
+          Padding(
+            padding: const EdgeInsets.all(AppSpace.s4),
+            child: Row(
+              children: [
+                const CircleAvatar(
+                  backgroundColor: AppColors.neutralInverseRaised,
+                  child: Icon(Icons.person, color: AppColors.neutralOnInverse),
+                ),
+                const SizedBox(width: AppSpace.s2),
+                Expanded(
+                  child: Text(
+                    name,
+                    style: const TextStyle(
+                      color: AppColors.neutralOnInverse,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminAccountPage extends StatelessWidget {
+  const _AdminAccountPage({
+    required this.session,
+    required this.onLogout,
+    required this.showSettingsNotice,
+  });
+
+  final AuthSession session;
+  final Future<void> Function() onLogout;
+  final bool showSettingsNotice;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Menu')),
+      body: ListView(
+        padding: const EdgeInsets.all(AppSpace.s4),
+        children: [
+          Card(
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: AppColors.brandPrimaryContainer,
+                child: Text(
+                  session.nama.isEmpty ? '?' : session.nama[0].toUpperCase(),
+                  style: const TextStyle(
+                    color: AppColors.brandPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              title: Text(session.nama),
+              subtitle: const Text('Administrator'),
+            ),
+          ),
+          if (showSettingsNotice)
+            const Card(
+              child: ListTile(
+                leading: Icon(Icons.info_outline),
+                title: Text('Pengaturan'),
+                subtitle: Text('Pengaturan sistem belum tersedia.'),
+              ),
+            ),
+          const SizedBox(height: AppSpace.s3),
+          OutlinedButton.icon(
+            onPressed: onLogout,
+            icon: const Icon(Icons.logout),
+            label: const Text('Keluar'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UnavailableAdminPage extends StatelessWidget {
+  const _UnavailableAdminPage({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: DesignEmptyState(
+        icon: Icons.construction_outlined,
+        title: 'Belum tersedia',
+        message: message,
+      ),
     );
   }
 }

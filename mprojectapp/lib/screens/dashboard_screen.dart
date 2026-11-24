@@ -6,8 +6,11 @@ import '../models/session.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/fcm_service.dart';
-import '../widgets/dashboard_widgets.dart';
+import '../theme/app_theme.dart';
+import '../theme/app_tokens.dart';
+import '../widgets/design_system_widgets.dart';
 import 'login_screen.dart';
+import 'petugas_locker_screens.dart';
 
 class DashboardScreen extends StatefulWidget {
   final FcmService fcmService;
@@ -36,6 +39,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   StreamSubscription? _openedAppSub;
   DateTime? _lastFetch;
   bool _handlingExpiredSession = false;
+  int _selectedTab = 0;
 
   // Anti spam snackbar: track locker yang sudah di-snackbar pada sesi ini.
   // Reset saat locker keluar dari needs_attention.
@@ -214,11 +218,11 @@ class _DashboardScreenState extends State<DashboardScreen>
         content: Text(body),
         duration: const Duration(seconds: 5),
         backgroundColor: isReminder
-            ? Colors.deepOrange.shade700
-            : Colors.red.shade700,
+            ? AppColors.warningMain
+            : AppColors.dangerMain,
         action: SnackBarAction(
           label: 'Lihat',
-          textColor: Colors.white,
+          textColor: AppColors.neutralOnInverse,
           onPressed: () {
             // Scroll ke atas / refresh — di sini cukup refresh
             _loadLockers(silent: true);
@@ -268,42 +272,41 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Future<void> _resolveLocker(Locker locker) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Selesaikan Locker?'),
-        content: Text(
-          'Pastikan kamu sudah mengecek dan menutup fisik ${locker.lockerId} '
-          'sebelum menandainya kosong kembali.',
+  Future<void> _openLocker(Locker locker) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LockerDetailScreen(
+          locker: locker,
+          onHandle: () => _openHandling(locker),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Ya, Selesaikan'),
-          ),
-        ],
       ),
     );
+    if (mounted) _loadLockers(silent: true);
+  }
 
-    if (confirmed != true) return;
+  Future<bool> _openHandling(Locker locker) async {
+    final resolved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => LockerHandlingScreen(
+          locker: locker,
+          onResolve: () => _resolveLocker(locker),
+        ),
+      ),
+    );
+    return resolved == true;
+  }
 
+  Future<void> _resolveLocker(Locker locker) async {
     try {
       await _api.resolveLocker(locker.lockerId);
       if (!mounted) return;
 
-      // Tutup snackbar untuk locker ini (accordion cleanup)
       _closeLockerSnackBar(locker.lockerId);
       _snackbarShownFor.remove(locker.lockerId);
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${locker.lockerId} ditandai kosong')),
       );
-      _loadLockers(silent: true);
+      await _loadLockers(silent: true);
     } catch (e) {
       if (!mounted) return;
       if (e is ApiException && e.statusCode == 401) {
@@ -312,29 +315,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       }
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Gagal resolve: $e')));
-    }
-  }
-
-  Color _statusColor(LockerStatus status) {
-    switch (status) {
-      case LockerStatus.empty:
-        return Colors.green;
-      case LockerStatus.occupied:
-        return Colors.orange;
-      case LockerStatus.needsAttention:
-        return Colors.red;
-    }
-  }
-
-  String _statusLabel(LockerStatus status) {
-    switch (status) {
-      case LockerStatus.empty:
-        return 'Kosong';
-      case LockerStatus.occupied:
-        return 'Terisi';
-      case LockerStatus.needsAttention:
-        return 'Perlu Perhatian';
+      ).showSnackBar(SnackBar(content: Text('Gagal menyelesaikan locker: $e')));
     }
   }
 
@@ -342,134 +323,329 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard Petugas'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _selectedTab == 0
+                  ? 'Smart Locker'
+                  : _selectedTab == 1
+                  ? 'Riwayat'
+                  : 'Akun',
+              style: AppType.title,
+            ),
+            Text(
+              _selectedTab == 0
+                  ? 'Petugas · ${widget.session.nama}'
+                  : 'Petugas',
+              style: AppType.caption.copyWith(
+                color: AppColors.neutralTextMuted,
+              ),
+            ),
+          ],
+        ),
         actions: [
-          IconButton(
-            onPressed: () => _loadLockers(),
-            icon: const Icon(Icons.refresh),
+          if (_selectedTab != 2)
+            IconButton(
+              onPressed: () => _loadLockers(),
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Muat ulang',
+            ),
+        ],
+      ),
+      body: _buildSelectedBody(),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedTab,
+        onDestinationSelected: (index) => setState(() => _selectedTab = index),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.grid_view_outlined),
+            selectedIcon: Icon(Icons.grid_view_rounded),
+            label: 'Locker',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.history_outlined),
+            selectedIcon: Icon(Icons.history),
+            label: 'Riwayat',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Akun',
           ),
         ],
       ),
-      body: RefreshIndicator(onRefresh: _loadLockers, child: _buildBody()),
     );
   }
 
   int _countByStatus(LockerStatus s) =>
       _lockers.where((l) => l.status == s).length;
 
-  Widget _buildBody() {
+  Widget _buildSelectedBody() {
     if (_loading && _lockers.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
     if (_error != null && _lockers.isEmpty) {
-      return ListView(
-        children: [
-          const SizedBox(height: 80),
-          const Icon(Icons.error_outline, color: Colors.red, size: 40),
-          const SizedBox(height: 12),
-          Center(child: Text(_error!)),
-        ],
+      return RefreshIndicator(
+        onRefresh: _loadLockers,
+        child: ListView(
+          children: [
+            const SizedBox(height: 120),
+            DesignEmptyState(
+              icon: Icons.cloud_off_outlined,
+              title: 'Data locker tidak dapat dimuat',
+              message: _error!,
+            ),
+            const SizedBox(height: AppSpace.s4),
+            Center(
+              child: OutlinedButton.icon(
+                onPressed: _loadLockers,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Coba lagi'),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1000),
-        child: ListView(
-          padding: const EdgeInsets.all(12),
-          children: [
-            ProfileHeader(
-              nama: widget.session.nama,
-              roleLabel: 'Petugas Keamanan',
-              roleColor: Colors.teal,
-              onLogout: _logout,
-            ),
-            const SizedBox(height: 16),
-            StatGrid(
-              cards: [
-                StatCard(
-                  label: 'Kosong',
-                  value: '${_countByStatus(LockerStatus.empty)}',
-                  icon: Icons.lock_open,
-                  color: Colors.green,
+    return switch (_selectedTab) {
+      0 => _buildLockerHome(),
+      1 => const DesignEmptyState(
+        icon: Icons.history,
+        title: 'Riwayat belum tersedia',
+        message: 'Server belum menyediakan endpoint riwayat tindakan Petugas.',
+      ),
+      _ => _buildAccountPage(),
+    };
+  }
+
+  Widget _buildLockerHome() {
+    final attention = _lockers
+        .where((locker) => locker.status == LockerStatus.needsAttention)
+        .toList();
+    final lockerCards = LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 700 ? 2 : 1;
+        if (columns == 1) {
+          return Column(
+            children: _lockers
+                .map(
+                  (locker) => LockerSummaryCard(
+                    locker: locker,
+                    onTap: () => _openLocker(locker),
+                  ),
+                )
+                .toList(),
+          );
+        }
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _lockers.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisExtent: 118,
+            crossAxisSpacing: AppSpace.s3,
+            mainAxisSpacing: AppSpace.s2,
+          ),
+          itemBuilder: (context, index) {
+            final locker = _lockers[index];
+            return LockerSummaryCard(
+              locker: locker,
+              onTap: () => _openLocker(locker),
+            );
+          },
+        );
+      },
+    );
+
+    return RefreshIndicator(
+      onRefresh: _loadLockers,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AppSize.contentMax),
+          child: ListView(
+            padding: const EdgeInsets.all(AppSpace.s4),
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return GridView.count(
+                    crossAxisCount: 3,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: AppSpace.s2,
+                    crossAxisSpacing: AppSpace.s2,
+                    childAspectRatio: constraints.maxWidth >= 700 ? 2.4 : 1.25,
+                    children: [
+                      DesignMetricCard(
+                        label: 'Kosong',
+                        value: '${_countByStatus(LockerStatus.empty)}',
+                        style: AppStatus.success,
+                      ),
+                      DesignMetricCard(
+                        label: 'Disewa',
+                        value: '${_countByStatus(LockerStatus.occupied)}',
+                        style: AppStatus.info,
+                      ),
+                      DesignMetricCard(
+                        label: 'Perhatian',
+                        value: '${attention.length}',
+                        style: AppStatus.warning,
+                        highlighted: attention.isNotEmpty,
+                      ),
+                    ],
+                  );
+                },
+              ),
+              if (attention.isNotEmpty) ...[
+                const SizedBox(height: AppSpace.s6),
+                DesignSectionHeader(
+                  title: 'Perlu tindakan',
+                  trailing: DesignStatusBadge(
+                    label: '${attention.length}',
+                    style: AppStatus.warning,
+                  ),
                 ),
-                StatCard(
-                  label: 'Terisi',
-                  value: '${_countByStatus(LockerStatus.occupied)}',
-                  icon: Icons.lock_outline,
-                  color: Colors.orange,
-                ),
-                StatCard(
-                  label: 'Perlu Perhatian',
-                  value: '${_countByStatus(LockerStatus.needsAttention)}',
-                  icon: Icons.warning_amber_rounded,
-                  color: Colors.red,
-                ),
-                StatCard(
-                  label: 'Total Locker',
-                  value: '${_lockers.length}',
-                  icon: Icons.grid_view_rounded,
-                  color: Colors.indigo,
+                const SizedBox(height: AppSpace.s2),
+                ...attention.map(
+                  (locker) => _AttentionCard(
+                    locker: locker,
+                    onTap: () => _openLocker(locker),
+                    onHandle: () => _openLocker(locker),
+                  ),
                 ),
               ],
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Status Locker',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            if (_lockers.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(child: Text('Belum ada data locker')),
-              )
-            else
-              ..._lockers.map(_buildLockerTile),
-          ],
+              const SizedBox(height: AppSpace.s6),
+              const DesignSectionHeader(title: 'Semua locker'),
+              const SizedBox(height: AppSpace.s2),
+              if (_lockers.isEmpty)
+                const DesignEmptyState(
+                  icon: Icons.inventory_2_outlined,
+                  title: 'Belum ada data locker',
+                  message: 'Tarik layar ke bawah untuk memuat ulang.',
+                )
+              else
+                lockerCards,
+              const SizedBox(height: AppSpace.s4),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildLockerTile(Locker locker) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: _statusColor(locker.status).withValues(alpha: 0.15),
-          child: Text(
-            locker.lockerId.replaceAll(RegExp(r'[^0-9]'), ''),
-            style: TextStyle(
-              color: _statusColor(locker.status),
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
+  Widget _buildAccountPage() {
+    return ListView(
+      padding: const EdgeInsets.all(AppSpace.s4),
+      children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpace.s4),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 26,
+                  backgroundColor: AppColors.brandPrimaryContainer,
+                  child: Text(
+                    widget.session.nama.isEmpty
+                        ? '?'
+                        : widget.session.nama[0].toUpperCase(),
+                    style: AppType.title.copyWith(
+                      color: AppColors.brandPrimary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpace.s3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.session.nama, style: AppType.subtitle),
+                      const SizedBox(height: AppSpace.s1),
+                      Text(
+                        'Petugas',
+                        style: AppType.caption.copyWith(
+                          color: AppColors.neutralTextMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),
-        title: Row(
+        const SizedBox(height: AppSpace.s3),
+        OutlinedButton.icon(
+          onPressed: _logout,
+          icon: const Icon(Icons.logout),
+          label: const Text('Keluar'),
+        ),
+      ],
+    );
+  }
+}
+
+class _AttentionCard extends StatelessWidget {
+  const _AttentionCard({
+    required this.locker,
+    required this.onTap,
+    required this.onHandle,
+  });
+
+  final Locker locker;
+  final VoidCallback onTap;
+  final VoidCallback onHandle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: AppStatus.warning.tint,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.hero),
+        side: const BorderSide(color: AppColors.warningBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpace.s4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: Text(locker.lockerId)),
-            StatusBadge(
-              text: _statusLabel(locker.status),
-              color: _statusColor(locker.status),
+            InkWell(
+              onTap: onTap,
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    color: AppColors.warningMain,
+                  ),
+                  const SizedBox(width: AppSpace.s2),
+                  Expanded(
+                    child: Text(locker.lockerId, style: AppType.subtitle),
+                  ),
+                  DesignStatusBadge(
+                    label: 'Perhatian',
+                    style: AppStatus.warning,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpace.s2),
+            Text(
+              'Perlu pemeriksaan fisik · ${locker.needsAttentionSinceLabel}',
+              style: AppType.caption.copyWith(color: AppColors.neutralTextBody),
+            ),
+            const SizedBox(height: AppSpace.s3),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: onHandle,
+                child: const Text('Tangani sekarang'),
+              ),
             ),
           ],
         ),
-        subtitle: Text(
-          locker.status == LockerStatus.occupied
-              ? 'Durasi berjalan: ${locker.displayDuration}'
-              : locker.status == LockerStatus.needsAttention
-              ? 'Sejak ${locker.needsAttentionSinceLabel}'
-              : 'Siap disewa',
-        ),
-        trailing: locker.status == LockerStatus.needsAttention
-            ? FilledButton.tonal(
-                onPressed: () => _resolveLocker(locker),
-                child: const Text('Resolve'),
-              )
-            : null,
       ),
     );
   }
