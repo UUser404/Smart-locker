@@ -115,13 +115,15 @@ class AdminAnalyticsScreen extends StatelessWidget {
         builder: (context, constraints) {
           final columns = constraints.maxWidth >= 900 ? 4 : 2;
           final cardHeight = constraints.maxWidth >= 900 ? 104.0 : 88.0;
-          return GridView.count(
-            crossAxisCount: columns,
+          return GridView(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              mainAxisExtent: cardHeight,
+              mainAxisSpacing: AppSpace.s2,
+              crossAxisSpacing: AppSpace.s2,
+            ),
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: AppSpace.s2,
-            crossAxisSpacing: AppSpace.s2,
-            mainAxisExtent: cardHeight,
             children: [
               DesignMetricCard(
                 label: 'Total sewa',
