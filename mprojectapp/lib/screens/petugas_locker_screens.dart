@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart' show kLongPressTimeout;
 import 'package:flutter/material.dart';
 
 import '../models/locker.dart';
@@ -462,11 +463,16 @@ class _EmergencyActionSheetState extends State<_EmergencyActionSheet> {
     super.dispose();
   }
 
-  void _startHold() {
+  void _startHold({Duration elapsedBeforeStart = Duration.zero}) {
     if (_submitting || _holdTimer != null) return;
 
+    final totalHoldMs = AppMotion.holdToConfirm.inMilliseconds;
+    final elapsedMs = elapsedBeforeStart.inMilliseconds;
+    final remaining = AppMotion.holdToConfirm - elapsedBeforeStart;
+    if (remaining <= Duration.zero) return;
+
     setState(() {
-      _holdProgress = 0;
+      _holdProgress = elapsedMs / totalHoldMs;
       _errorMessage = null;
     });
 
@@ -478,14 +484,12 @@ class _EmergencyActionSheetState extends State<_EmergencyActionSheet> {
       }
       setState(() {
         _holdProgress =
-            (_holdProgress +
-                    progressInterval.inMilliseconds /
-                        AppMotion.holdToConfirm.inMilliseconds)
+            (_holdProgress + progressInterval.inMilliseconds / totalHoldMs)
                 .clamp(0.0, 1.0)
                 .toDouble();
       });
     });
-    _holdTimer = Timer(AppMotion.holdToConfirm, () {
+    _holdTimer = Timer(remaining, () {
       _holdTimer = null;
       _progressTimer?.cancel();
       _progressTimer = null;
@@ -613,11 +617,12 @@ class _EmergencyActionSheetState extends State<_EmergencyActionSheet> {
               button: true,
               enabled: !_submitting,
               label: 'Tahan 2 detik untuk membuka locker darurat',
-              child: Listener(
+              child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onPointerDown: (_) => _startHold(),
-                onPointerUp: (_) => _cancelHold(),
-                onPointerCancel: (_) => _cancelHold(),
+                onLongPressStart: (_) =>
+                    _startHold(elapsedBeforeStart: kLongPressTimeout),
+                onLongPressEnd: (_) => _cancelHold(),
+                onLongPressCancel: _cancelHold,
                 child: Container(
                   constraints: const BoxConstraints(
                     minHeight: AppSize.buttonMd,
