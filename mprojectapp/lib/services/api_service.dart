@@ -124,6 +124,56 @@ class ApiService {
     return body['new_status'] as String? ?? 'empty';
   }
 
+  /// POST /api/admin/lockers/{id}/emergency-open (butuh JWT)
+  Future<void> emergencyOpenLocker({
+    required String lockerId,
+    required String reason,
+    required bool endSession,
+  }) async {
+    final res = await _client
+        .post(
+          _uri(
+            '/admin/lockers/${Uri.encodeComponent(lockerId)}/emergency-open',
+          ),
+          headers: _headers(),
+          body: jsonEncode({'reason': reason, 'end_session': endSession}),
+        )
+        .timeout(const Duration(seconds: 30));
+
+    if (res.statusCode == 401) {
+      throw ApiException('Sesi berakhir, silakan login ulang', statusCode: 401);
+    }
+    if (res.statusCode == 403) {
+      throw ApiException('Akses buka darurat ditolak', statusCode: 403);
+    }
+    if (res.statusCode == 400) {
+      throw ApiException('Alasan buka darurat tidak valid', statusCode: 400);
+    }
+    if (res.statusCode == 404) {
+      throw ApiException(
+        'Locker atau sesi sewa tidak ditemukan',
+        statusCode: 404,
+      );
+    }
+    if (res.statusCode == 409) {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final message = switch (body['message']) {
+        'LOCKER_NOT_OCCUPIED' => 'Locker tidak sedang disewa',
+        'NO_ACTIVE_RENTAL' => 'Sesi sewa aktif tidak ditemukan',
+        'EMERGENCY_ACTION_PENDING' =>
+          'Perintah buka darurat sebelumnya masih diproses',
+        _ => 'Locker tidak dapat dibuka darurat saat ini',
+      };
+      throw ApiException(message, statusCode: 409);
+    }
+    if (res.statusCode != 202) {
+      throw ApiException(
+        'Gagal mengirim perintah buka darurat (${res.statusCode})',
+        statusCode: res.statusCode,
+      );
+    }
+  }
+
   // ==================== ADMIN: REPORTS ====================
 
   /// GET /api/admin/reports/rentals  (butuh JWT, role admin)

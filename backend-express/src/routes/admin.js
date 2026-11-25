@@ -136,6 +136,121 @@ router.post("/lockers/:id/resolve", requireAuth, async (req, res) => {
 });
 
 // ============================================================
+// POST /api/admin/lockers/:id/emergency-open
+// ============================================================
+router.post(
+    "/lockers/:id/emergency-open",
+    requireAuth,
+    requireRole("admin", "petugas"),
+    async (req, res) => {
+        const { id: lockerId } = req.params;
+        const { reason, end_session: endSession } = req.body || {};
+        const allowedReasons = [
+            "Lupa kode",
+            "Pintu macet",
+            "Keadaan darurat",
+            "Lainnya",
+        ];
+
+        if (!allowedReasons.includes(reason) || typeof endSession !== "boolean") {
+            return res.status(400).json({
+                status: "error",
+                message: "EMERGENCY_REQUEST_INVALID",
+            });
+        }
+
+        const lockerRef = db.collection("lockers").doc(lockerId);
+        const auditRef = db.collection("emergency_actions").doc();
+        const requestedAt = new Date();
+
+        try {
+            const result = await db.runTransaction(async (tx) => {
+                const lockerDoc = await tx.get(lockerRef);
+                if (!lockerDoc.exists) throw new Error("LOCKER_NOT_FOUND");
+
+                const locker = lockerDoc.data();
+                if (locker.status !== "occupied") {
+                    throw new Error("LOCKER_NOT_OCCUPIED");
+                }
+                if (!locker.currentRentalId) throw new Error("NO_ACTIVE_RENTAL");
+                if (locker.pendingCommand === "unlock" || locker.pendingEnd === true) {
+                    throw new Error("EMERGENCY_ACTION_PENDING");
+                }
+
+                const rentalRef = db.collection("rentals").doc(locker.currentRentalId);
+                const rentalDoc = await tx.get(rentalRef);
+                if (!rentalDoc.exists) throw new Error("RENTAL_NOT_FOUND");
+                if (rentalDoc.data().status !== "active") {
+                    throw new Error("NO_ACTIVE_RENTAL");
+                }
+
+                tx.update(rentalRef, {
+                    ...(endSession ? { status: "pending_end" } : {}),
+                    lastAccessAt: requestedAt,
+                    accessAction: endSession
+                        ? "emergency_end"
+                        : "emergency_continue",
+                });
+
+                tx.update(lockerRef, {
+                    pendingCommand: "unlock",
+                    unlockedSince: requestedAt,
+                    pendingEnd: endSession,
+                });
+
+                const actor = req.user || {};
+                tx.create(auditRef, {
+                    action: "emergency_open",
+                    lockerId,
+                    rentalId: locker.currentRentalId,
+                    reason,
+                    endSession,
+                    requestedBy: actor.username || null,
+                    requestedByName: actor.nama || null,
+                    role: actor.role || null,
+                    result: "queued",
+                    requestedAt,
+                });
+
+                return {
+                    locker_id: lockerId,
+                    command_status: "queued",
+                    end_session: endSession,
+                };
+            });
+
+            return res.status(202).json({
+                status: "ok",
+                ...result,
+            });
+        } catch (err) {
+            if (err.message === "LOCKER_NOT_FOUND" || err.message === "RENTAL_NOT_FOUND") {
+                return res.status(404).json({
+                    status: "error",
+                    message: err.message,
+                });
+            }
+            if (
+                err.message === "LOCKER_NOT_OCCUPIED" ||
+                err.message === "NO_ACTIVE_RENTAL" ||
+                err.message === "EMERGENCY_ACTION_PENDING"
+            ) {
+                return res.status(409).json({
+                    status: "error",
+                    message: err.message,
+                });
+            }
+
+            console.error("[emergency-open] error:", err);
+            return res.status(500).json({
+                status: "error",
+                message: "SERVER_ERROR",
+            });
+        }
+    }
+);
+
+// ============================================================
 // POST /api/admin/register-device — tanpa auth (first-time)
 // Setelah register sukses, kirim catch-up notif untuk locker
 // needs_attention yang mungkin terlewat.

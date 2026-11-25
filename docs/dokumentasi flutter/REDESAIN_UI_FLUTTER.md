@@ -12,7 +12,7 @@ dari kebutuhan data atau operasi backend.
 | Penanganan locker | Checklist pemeriksaan fisik dan tombol penyelesaian yang terkunci sampai checklist lengkap | Status sensor pintu tidak tersedia dari API |
 | Konfirmasi kosongkan | Konfirmasi sebelum memanggil endpoint resolve | Backend hanya mengubah status locker; pencatatan audit belum tersedia |
 | Detail locker | Status, durasi, dan tindakan berdasarkan status locker | Detail penyewa dan konektivitas perangkat tidak tersedia di endpoint Petugas |
-| Buka darurat | Pesan aksi tersedia/tidak tersedia ditampilkan tanpa menjalankan operasi | Endpoint buka darurat dan pencatatan alasan/audit belum tersedia; aksi tidak boleh diaktifkan dari UI saja |
+| Buka darurat | Meminta alasan, pilihan status sesi, tahan 2 detik, antrekan unlock terautentikasi dan catat permintaan | Hasil buka fisik tetap bergantung pada firmware; log tersimpan tetapi belum memiliki layar/API riwayat audit |
 | Perangkat offline | UI belum bisa mengidentifikasi keadaan offline secara dinamis | Model/API locker belum menyediakan status offline atau waktu `last_seen`; belum ada state perangkat offline yang nyata |
 | Admin mobile | Ringkasan, riwayat sewa, log audit, dan menu melalui navigasi bawah | Data log audit dan jumlah buka darurat belum tersedia; nilai tersebut ditandai belum tersedia |
 | Admin web | Sidebar, header, banner perhatian, KPI, kartu locker dua kolom, panel kejadian, panel pemakaian, riwayat berbentuk tabel, dan halaman log audit | Panel kejadian/pemakaian dan data audit memakai state belum tersedia karena endpoint belum ada; Manajemen Petugas/Pengaturan belum didukung API |

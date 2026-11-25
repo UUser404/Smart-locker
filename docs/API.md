@@ -442,6 +442,7 @@ Endpoint yang diproteksi JWT:
 
 - `GET /api/admin/lockers`
 - `POST /api/admin/lockers/{locker_id}/resolve`
+- `POST /api/admin/lockers/{locker_id}/emergency-open` (role `admin` atau `petugas`)
 - `GET /api/admin/reports/rentals` (khusus role `admin`)
 - `POST /api/admin/unregister-device` (role apa saja)
 
@@ -486,6 +487,41 @@ Dipanggil petugas lewat app setelah mengecek & menutup manual locker yang bersta
 
 - `404 LOCKER_NOT_FOUND` — locker tidak ada
 - `409 NOT_NEEDS_ATTENTION` — locker sudah tidak dalam status `needs_attention`
+
+### 10.4.1 Buka Darurat Locker
+
+**`POST /api/admin/lockers/{locker_id}/emergency-open`** — butuh JWT, role `admin` atau `petugas`
+
+Memvalidasi sesi aktif, mencatat alasan dan petugas di koleksi `emergency_actions`, lalu mengantrekan perintah `unlock` untuk firmware. Endpoint hanya menerima locker berstatus `occupied`.
+
+**Request body:**
+
+```json
+{
+  "reason": "Lupa kode",
+  "end_session": false
+}
+```
+
+`reason` wajib salah satu dari `Lupa kode`, `Pintu macet`, `Keadaan darurat`, atau `Lainnya`. `end_session` wajib boolean. Jika `true`, sesi berubah menjadi `pending_end` dan baru difinalisasi setelah firmware melaporkan pintu tertutup.
+
+**Response diterima (202):**
+
+```json
+{
+  "status": "ok",
+  "locker_id": "locker_01",
+  "command_status": "queued",
+  "end_session": false
+}
+```
+
+**Response gagal:**
+
+- `400 EMERGENCY_REQUEST_INVALID` — alasan atau pilihan akhir sesi tidak valid
+- `401` / `403` — sesi tidak valid atau role tidak diizinkan
+- `404 LOCKER_NOT_FOUND` / `RENTAL_NOT_FOUND` — locker atau sesi tidak ditemukan
+- `409 LOCKER_NOT_OCCUPIED` / `NO_ACTIVE_RENTAL` / `EMERGENCY_ACTION_PENDING` — keadaan locker tidak mengizinkan aksi baru
 
 ### 10.5 Register Device Notifikasi
 

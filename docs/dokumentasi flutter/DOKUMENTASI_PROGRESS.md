@@ -165,7 +165,8 @@ mprojectapp/lib/
 - ✅ Tema token untuk warna, tipografi Inter, radius, spasi, dan breakpoint responsif
 - ✅ Tampilan Petugas dan Admin mengikuti struktur mockup mobile/web yang datanya tersedia
 - ✅ Status locker dibedakan dengan warna dan label; data perangkat/aktivitas yang belum ada ditandai jelas
-- ⚠️ Audit, konektivitas ESP32, dan aksi buka darurat memerlukan dukungan API sebelum bisa aktif
+- ✅ Aksi buka darurat terautentikasi, mencatat alasan/petugas, dan mengantrekan perintah unlock; konfirmasi fisik tetap bergantung pada firmware
+- ⚠️ Konektivitas ESP32 dan tampilan riwayat audit belum tersedia dari API
 - Detail cakupan UI dan batasan integrasi: `docs/dokumentasi flutter/REDESAIN_UI_FLUTTER.md`
 
 ---

@@ -278,6 +278,8 @@ class _DashboardScreenState extends State<DashboardScreen>
         builder: (_) => LockerDetailScreen(
           locker: locker,
           onHandle: () => _openHandling(locker),
+          onEmergencyOpen: (reason, endSession) =>
+              _emergencyOpenLocker(locker, reason, endSession),
         ),
       ),
     );
@@ -316,6 +318,34 @@ class _DashboardScreenState extends State<DashboardScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Gagal menyelesaikan locker: $e')));
+    }
+  }
+
+  Future<void> _emergencyOpenLocker(
+    Locker locker,
+    String reason,
+    bool endSession,
+  ) async {
+    try {
+      await _api.emergencyOpenLocker(
+        lockerId: locker.lockerId,
+        reason: reason,
+        endSession: endSession,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Perintah buka darurat ${locker.lockerId} dikirim ke locker',
+          ),
+        ),
+      );
+      await _loadLockers(silent: true);
+    } catch (e) {
+      if (e is ApiException && e.statusCode == 401) {
+        await _handleExpiredSession();
+      }
+      rethrow;
     }
   }
 

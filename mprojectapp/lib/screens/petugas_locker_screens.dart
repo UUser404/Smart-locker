@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/locker.dart';
@@ -9,11 +11,13 @@ class LockerDetailScreen extends StatelessWidget {
   const LockerDetailScreen({
     required this.locker,
     required this.onHandle,
+    required this.onEmergencyOpen,
     super.key,
   });
 
   final Locker locker;
   final Future<bool> Function() onHandle;
+  final Future<void> Function(String reason, bool endSession) onEmergencyOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +96,10 @@ class LockerDetailScreen extends StatelessWidget {
               label: const Text('Tangani sekarang'),
             )
           else if (isOccupied)
-            _EmergencyActionCard(locker: locker),
+            _EmergencyActionCard(
+              locker: locker,
+              onEmergencyOpen: onEmergencyOpen,
+            ),
           if (isOccupied) ...[
             const SizedBox(height: AppSpace.s3),
             const _UnavailableAction(
@@ -374,9 +381,13 @@ class _UnavailableAction extends StatelessWidget {
 }
 
 class _EmergencyActionCard extends StatelessWidget {
-  const _EmergencyActionCard({required this.locker});
+  const _EmergencyActionCard({
+    required this.locker,
+    required this.onEmergencyOpen,
+  });
 
   final Locker locker;
+  final Future<void> Function(String reason, bool endSession) onEmergencyOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -404,7 +415,10 @@ class _EmergencyActionCard extends StatelessWidget {
             onPressed: () => showModalBottomSheet<void>(
               context: context,
               isScrollControlled: true,
-              builder: (_) => _EmergencyActionSheet(locker: locker),
+              builder: (_) => _EmergencyActionSheet(
+                locker: locker,
+                onEmergencyOpen: onEmergencyOpen,
+              ),
             ),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(AppSize.buttonMd),
@@ -420,9 +434,13 @@ class _EmergencyActionCard extends StatelessWidget {
 }
 
 class _EmergencyActionSheet extends StatefulWidget {
-  const _EmergencyActionSheet({required this.locker});
+  const _EmergencyActionSheet({
+    required this.locker,
+    required this.onEmergencyOpen,
+  });
 
   final Locker locker;
+  final Future<void> Function(String reason, bool endSession) onEmergencyOpen;
 
   @override
   State<_EmergencyActionSheet> createState() => _EmergencyActionSheetState();
@@ -431,6 +449,82 @@ class _EmergencyActionSheet extends StatefulWidget {
 class _EmergencyActionSheetState extends State<_EmergencyActionSheet> {
   String _reason = 'Lupa kode';
   bool _endSession = false;
+  bool _submitting = false;
+  double _holdProgress = 0;
+  String? _errorMessage;
+  Timer? _holdTimer;
+  Timer? _progressTimer;
+
+  @override
+  void dispose() {
+    _holdTimer?.cancel();
+    _progressTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startHold() {
+    if (_submitting || _holdTimer != null) return;
+
+    setState(() {
+      _holdProgress = 0;
+      _errorMessage = null;
+    });
+
+    const progressInterval = Duration(milliseconds: 50);
+    _progressTimer = Timer.periodic(progressInterval, (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _holdProgress =
+            (_holdProgress +
+                    progressInterval.inMilliseconds /
+                        AppMotion.holdToConfirm.inMilliseconds)
+                .clamp(0.0, 1.0)
+                .toDouble();
+      });
+    });
+    _holdTimer = Timer(AppMotion.holdToConfirm, () {
+      _holdTimer = null;
+      _progressTimer?.cancel();
+      _progressTimer = null;
+      if (!mounted) return;
+      setState(() => _holdProgress = 1);
+      _submitEmergencyOpen();
+    });
+  }
+
+  void _cancelHold() {
+    if (_holdTimer == null) return;
+    _holdTimer!.cancel();
+    _holdTimer = null;
+    _progressTimer?.cancel();
+    _progressTimer = null;
+    if (mounted) setState(() => _holdProgress = 0);
+  }
+
+  Future<void> _submitEmergencyOpen() async {
+    if (_submitting) return;
+    setState(() {
+      _submitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await widget.onEmergencyOpen(_reason, _endSession);
+      if (mounted) Navigator.of(context).pop();
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _holdProgress = 0;
+          _errorMessage = error.toString();
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -502,20 +596,76 @@ class _EmergencyActionSheetState extends State<_EmergencyActionSheet> {
                 borderRadius: BorderRadius.circular(AppRadius.field),
               ),
               child: Text(
-                'Aksi ini akan dicatat atas nama Anda. Fungsi buka darurat belum tersedia pada API.',
+                'Perintah akan dicatat atas nama Anda dan dikirim ke locker. Pastikan tindakan ini memang diperlukan.',
                 style: AppType.caption.copyWith(color: AppColors.warningText),
               ),
             ),
             const SizedBox(height: AppSpace.s4),
-            FilledButton(
-              onPressed: null,
-              style: FilledButton.styleFrom(
-                disabledBackgroundColor: AppColors.dangerMain.withValues(
-                  alpha: AppOpacity.disabled,
-                ),
-                disabledForegroundColor: AppColors.neutralOnInverse,
+            if (_errorMessage != null) ...[
+              Text(
+                _errorMessage!,
+                style: AppType.caption.copyWith(color: AppColors.dangerText),
+                textAlign: TextAlign.center,
               ),
-              child: const Text('Tahan 2 detik untuk membuka'),
+              const SizedBox(height: AppSpace.s2),
+            ],
+            Semantics(
+              button: true,
+              enabled: !_submitting,
+              label: 'Tahan 2 detik untuk membuka locker darurat',
+              child: Listener(
+                behavior: HitTestBehavior.opaque,
+                onPointerDown: (_) => _startHold(),
+                onPointerUp: (_) => _cancelHold(),
+                onPointerCancel: (_) => _cancelHold(),
+                child: Container(
+                  constraints: const BoxConstraints(
+                    minHeight: AppSize.buttonMd,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.dangerMain,
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpace.s4,
+                    vertical: AppSpace.s3,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _submitting
+                            ? 'Mengirim perintah...'
+                            : _holdProgress > 0
+                            ? 'Tahan... ${(_holdProgress * 100).round()}%'
+                            : 'Tahan 2 detik untuk membuka',
+                        textAlign: TextAlign.center,
+                        style: AppType.bodyStrong.copyWith(
+                          color: AppColors.neutralOnInverse,
+                        ),
+                      ),
+                      if (_submitting) ...[
+                        const SizedBox(height: AppSpace.s2),
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.neutralOnInverse,
+                          ),
+                        ),
+                      ] else if (_holdProgress > 0) ...[
+                        const SizedBox(height: AppSpace.s2),
+                        LinearProgressIndicator(
+                          value: _holdProgress,
+                          color: AppColors.neutralOnInverse,
+                          backgroundColor: AppColors.dangerContainer,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
             ),
             const SizedBox(height: AppSpace.s2),
             OutlinedButton(

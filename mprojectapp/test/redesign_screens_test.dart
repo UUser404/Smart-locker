@@ -127,6 +127,58 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('emergency open requires a continuous two-second hold', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    String? submittedReason;
+    bool? submittedEndSession;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LockerDetailScreen(
+          locker: Locker(lockerId: 'locker_01', status: LockerStatus.occupied),
+          onHandle: () async => false,
+          onEmergencyOpen: (reason, endSession) async {
+            submittedReason = reason;
+            submittedEndSession = endSession;
+          },
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Buka darurat locker_01'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pintu macet'));
+    await tester.tap(find.text('Akhiri sesi'));
+    await tester.pumpAndSettle();
+
+    final holdLabel = find.text('Tahan 2 detik untuk membuka');
+    await tester.ensureVisible(holdLabel);
+    await tester.pumpAndSettle();
+    final shortHold = await tester.startGesture(tester.getCenter(holdLabel));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.textContaining('Tahan...'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 1400));
+    expect(submittedReason, isNull);
+    await shortHold.up();
+    await tester.pump();
+    expect(holdLabel, findsOneWidget);
+    await tester.ensureVisible(holdLabel);
+    await tester.pumpAndSettle();
+    final fullHold = await tester.startGesture(tester.getCenter(holdLabel));
+    await tester.pump(const Duration(milliseconds: 2100));
+    await fullHold.up();
+    await tester.pumpAndSettle();
+
+    expect(submittedReason, 'Pintu macet');
+    expect(submittedEndSession, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('resolve stays disabled until both physical checks are marked', (
     tester,
   ) async {
