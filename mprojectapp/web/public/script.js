@@ -34,6 +34,10 @@ function backToScanner() {
   state.rentalId = null;
   state.uniqueCode = null;
   state.startedAt = null;
+  const homeUrl = `${window.location.origin}/`;
+  if (`${window.location.pathname}${window.location.search}` !== "/") {
+    window.history.replaceState(null, "", homeUrl);
+  }
   showScreen("screen-scanner");
   startCamera();
 }
@@ -207,13 +211,37 @@ function leaveScanner(screenId) {
 }
 
 // === QR PAYLOAD PARSER ===
-// Format dari firmware: "locker_01.9f3a1c" (dot-separated)
-// Sesuai tft_render.cpp: String(lockerId) + "." + String(token)
+// QR firmware berisi link frontend dengan identitas locker dan token dinamis.
 function handleScannedPayload(raw) {
   document.getElementById("camera-error").hidden = true;
 
-  const parts = String(raw).trim().split(".");
-  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+  const payload = String(raw).trim();
+  let lockerId;
+  let token;
+
+  try {
+    const url = new URL(payload);
+    if (url.protocol === "https:" || url.protocol === "http:") {
+      const pathParts = url.pathname.split("/").filter(Boolean);
+      if (pathParts.length === 1) {
+        lockerId = decodeURIComponent(pathParts[0]);
+        token = url.searchParams.get("token");
+      }
+    }
+  } catch (err) {
+    // QR text lama berbentuk lockerId.token; tetap diterima untuk kompatibilitas.
+  }
+
+  if (!lockerId && !token) {
+    // Keep accepting legacy dot-separated payloads during firmware rollout.
+    const parts = payload.split(".");
+    if (parts.length === 2) {
+      lockerId = parts[0];
+      token = parts[1];
+    }
+  }
+
+  if (!lockerId || !token) {
     showError("QR tidak valid. Pastikan scan QR di layar locker.");
     resumeScanning();
     return;
@@ -221,7 +249,6 @@ function handleScannedPayload(raw) {
 
   scanBusy = true; // hentikan decode; kamera tetap tampil selama server memeriksa
   setScanStatus("Memeriksa QR…");
-  const [lockerId, token] = parts;
   validateAndFetchStatus(lockerId, token);
 }
 
@@ -676,7 +703,14 @@ if (new URLSearchParams(location.search).get("dev") === "1") {
 // ============================================================
 // Cek apakah ada session tersimpan → kalau ada, restore ke screen session active
 const savedSession = loadSession();
-if (savedSession && savedSession.rentalId && savedSession.lockerId) {
+const currentUrl = new URL(window.location.href);
+const currentPathParts = currentUrl.pathname.split("/").filter(Boolean);
+const openedFromLockerQr =
+  currentPathParts.length === 1 && currentUrl.searchParams.has("token");
+
+if (openedFromLockerQr) {
+  handleScannedPayload(currentUrl.href);
+} else if (savedSession && savedSession.rentalId && savedSession.lockerId) {
   state.rentalId = savedSession.rentalId;
   state.lockerId = savedSession.lockerId;
   state.startedAt = new Date(savedSession.startedAt);
