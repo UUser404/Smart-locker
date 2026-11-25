@@ -34,9 +34,14 @@ function backToScanner() {
   state.rentalId = null;
   state.uniqueCode = null;
   state.startedAt = null;
-  const homeUrl = `${window.location.origin}/`;
-  if (`${window.location.pathname}${window.location.search}` !== "/") {
-    window.history.replaceState(null, "", homeUrl);
+  const currentUrl = new URL(window.location.href);
+  const pathParts = currentUrl.pathname.split("/").filter(Boolean);
+  if (currentUrl.searchParams.has("token") && pathParts.length > 0) {
+    pathParts.pop();
+    currentUrl.pathname = `/${pathParts.join("/")}${pathParts.length ? "/" : ""}`;
+    currentUrl.search = "";
+    currentUrl.hash = "";
+    window.history.replaceState(null, "", currentUrl.href);
   }
   showScreen("screen-scanner");
   startCamera();
@@ -223,8 +228,8 @@ function handleScannedPayload(raw) {
     const url = new URL(payload);
     if (url.protocol === "https:" || url.protocol === "http:") {
       const pathParts = url.pathname.split("/").filter(Boolean);
-      if (pathParts.length === 1) {
-        lockerId = decodeURIComponent(pathParts[0]);
+      if (pathParts.length > 0) {
+        lockerId = decodeURIComponent(pathParts[pathParts.length - 1]);
         token = url.searchParams.get("token");
       }
     }
@@ -706,7 +711,7 @@ const savedSession = loadSession();
 const currentUrl = new URL(window.location.href);
 const currentPathParts = currentUrl.pathname.split("/").filter(Boolean);
 const openedFromLockerQr =
-  currentPathParts.length === 1 && currentUrl.searchParams.has("token");
+  currentPathParts.length > 0 && currentUrl.searchParams.has("token");
 
 if (openedFromLockerQr) {
   handleScannedPayload(currentUrl.href);
