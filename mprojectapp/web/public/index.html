@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Smart Locker</title>
-<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="/style.css" />
 </head>
 <body>
 
@@ -151,14 +151,13 @@
   </main>
 </div>
 
-<!-- jsQR: coba file lokal (jsQR.js di folder yang sama) dulu, lalu jsDelivr, lalu unpkg -->
-<script src="jsQR.js"></script>
+<!-- jsQR: gunakan CDN utama lalu fallback ke unpkg -->
 <script>
   window.jsQR || document.write('<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"><\/script>');
 </script>
 <script>
   window.jsQR || document.write('<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"><\/script>');
 </script>
-<script src="script.js"></script>
+<script src="/script.js"></script>
 </body>
 </html>
