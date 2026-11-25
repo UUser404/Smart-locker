@@ -12,6 +12,7 @@ const kPollIntervalMs = 3000;   // polling rental status tiap 3 detik
 // === STATE ===
 const state = {
   lockerId: null,
+  lockerStatus: null,
   token: null,
   rentalId: null,
   uniqueCode: null,
@@ -28,6 +29,7 @@ function showScreen(id) {
 function backToScanner() {
   stopSessionTimer();
   state.lockerId = null;
+  state.lockerStatus = null;
   state.token = null;
   state.rentalId = null;
   state.uniqueCode = null;
@@ -270,6 +272,13 @@ async function validateAndFetchStatus(lockerId, token) {
     // Set locker ID di semua screen
     document.getElementById("rent-locker-id").textContent = lockerId;
     document.getElementById("access-locker-id").textContent = lockerId;
+    state.lockerStatus = data.status;
+    document.getElementById("access-status-label").textContent =
+      data.status === "needs_attention" ? "Perlu Perhatian" : "Sedang Disewa";
+    document.getElementById("access-hint").textContent =
+      data.status === "needs_attention"
+        ? "Locker ini tidak bisa disewa baru. Masukkan kode unik untuk mengambil barang dan mengakhiri sewa."
+        : "Kalau ini locker kamu, masukkan kode unik untuk membukanya.";
 
     // Render beda screen tergantung status
     if (data.status === "empty") {
@@ -433,6 +442,12 @@ document.getElementById("form-access").addEventListener("submit", async (e) => {
       state.startedAt = new Date(saved.startedAt);
     }
 
+    const continueButton = document.querySelector('[data-action="choice-continue"]');
+    const choiceHint = document.getElementById("choice-hint");
+    continueButton.hidden = state.lockerStatus === "needs_attention";
+    choiceHint.textContent = state.lockerStatus === "needs_attention"
+      ? "Locker perlu diperiksa. Ambil barang dan akhiri sewa."
+      : "Mau apa selanjutnya?";
     showScreen("screen-access-choice");
   } catch (err) {
     errorEl.textContent = err.message;
@@ -447,6 +462,7 @@ document.getElementById("form-access").addEventListener("submit", async (e) => {
 // STEP 4: Pilihan lanjut / akhiri sewa
 // ============================================================
 document.querySelector('[data-action="choice-continue"]').addEventListener("click", () => {
+  if (state.lockerStatus === "needs_attention") return;
   document.getElementById("session-locker-id").textContent = state.lockerId;
   showScreen("screen-session-active");
   startSessionTimer();
@@ -454,6 +470,7 @@ document.querySelector('[data-action="choice-continue"]').addEventListener("clic
 
 document.querySelector('[data-action="choice-end"]').addEventListener("click", async () => {
   const errorEl = document.getElementById("choice-error");
+  const endButton = document.querySelector('[data-action="choice-end"]');
   errorEl.hidden = true;
 
   if (!state.uniqueCode) {
@@ -464,6 +481,7 @@ document.querySelector('[data-action="choice-end"]').addEventListener("click", a
 
   // Kirim action "end" ke backend. Jangan tampilkan "Sewa Selesai" kalau gagal,
   // karena sewa masih berjalan di backend.
+  endButton.disabled = true;
   try {
     const res = await fetchWithTimeout(`${kApiBaseUrl}/lockers/${state.lockerId}/access`, {
       method: "POST",
@@ -483,21 +501,16 @@ document.querySelector('[data-action="choice-end"]').addEventListener("click", a
     errorEl.textContent = err.message;
     errorEl.hidden = false;
     return;
+  } finally {
+    endButton.disabled = false;
   }
 
-  // Hitung durasi dari startedAt
-  const seconds = state.startedAt
-    ? Math.floor((Date.now() - state.startedAt.getTime()) / 1000)
-    : 0;
-
-  document.getElementById("ended-duration").textContent = formatDuration(seconds);
-  showScreen("screen-session-ended");
-
-  // Clear session
-  clearSession();
-  state.rentalId = null;
-  state.uniqueCode = null;
-  state.startedAt = null;
+  const endingStatus = document.getElementById("ending-status");
+  endingStatus.textContent = state.rentalId
+    ? "Perintah diterima. Sewa akan selesai setelah pintu tertutup dan backend mengonfirmasi statusnya."
+    : "Perintah diterima. Sewa baru selesai setelah pintu tertutup; konfirmasi status tidak tersedia di perangkat ini.";
+  showScreen("screen-session-ending");
+  if (state.rentalId) startSessionTimer();
 });
 
 // ============================================================
@@ -581,6 +594,12 @@ async function pollRentalStatus() {
     document.getElementById("session-duration").textContent =
       formatDuration(data.elapsed_seconds);
   } catch (err) {
+    if (document.getElementById("screen-session-ending").classList.contains("active")) {
+      document.getElementById("ending-status").textContent =
+        "Permintaan diterima; masih menunggu pintu tertutup. Belum dapat memverifikasi penyelesaian sewa.";
+      return;
+    }
+
     // Kalau polling gagal, fallback ke client-side timer
     updateSessionDuration();
   }
@@ -611,6 +630,12 @@ document.querySelector('[data-action="go-to-session"]').addEventListener("click"
   showScreen("screen-session-active");
   startSessionTimer();
 });
+document.querySelector('[data-action="attention-access"]').addEventListener("click", () => {
+  document.getElementById("access-status-label").textContent = "Perlu Perhatian";
+  document.getElementById("access-hint").textContent =
+    "Locker ini tidak bisa disewa baru. Masukkan kode unik untuk mengambil barang dan mengakhiri sewa.";
+  showScreen("screen-access-code");
+});
 
 // ============================================================
 // DEV SIMULATION (hidden by default, aktif kalau URL ada ?dev=1)
@@ -632,6 +657,8 @@ if (new URLSearchParams(location.search).get("dev") === "1") {
       document.getElementById("access-locker-id").textContent = "locker_01";
       state.lockerId = "locker_01";
       state.token = "sim-token";
+      state.lockerStatus = sim === "needs_attention" ? "needs_attention" :
+        sim === "occupied" ? "occupied" : "empty";
 
       if (sim === "empty") showScreen("screen-rent-form");
       else if (sim === "occupied") showScreen("screen-access-code");

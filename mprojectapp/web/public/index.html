@@ -42,7 +42,8 @@
     <section id="screen-needs-attention" class="screen">
       <div class="icon-warning">!</div>
       <h2>Locker Sedang Tidak Bisa Dipakai</h2>
-      <p>Locker ini sedang dalam pengecekan petugas. Silakan coba locker lain atau kembali beberapa saat lagi.</p>
+      <p>Locker ini sedang dalam pengecekan petugas dan tidak bisa disewa. Jika barangmu masih di dalam, masukkan kode unik untuk mengambilnya dan mengakhiri sewa.</p>
+      <button class="btn-primary" data-action="attention-access">Saya pemilik locker ini</button>
       <button class="btn-secondary" data-action="back-to-scanner">Kembali ke Scanner</button>
     </section>
 
@@ -75,7 +76,7 @@
     <!-- ===================== KODE UNIK (1x tampil) ===================== -->
     <section id="screen-unique-code" class="screen">
       <div class="icon-success">✓</div>
-      <h2>Locker Terbuka!</h2>
+      <h2>Perintah Membuka Locker Terkirim</h2>
       <p class="hint">Simpan kode ini baik-baik. Kode ini <strong>hanya ditampilkan sekali</strong> dan dibutuhkan untuk mengambil barangmu nanti.</p>
       <div class="code-box">
         <span id="unique-code-text"></span>
@@ -97,8 +98,8 @@
 
     <!-- ===================== INPUT KODE UNIK (locker terisi) ===================== -->
     <section id="screen-access-code" class="screen">
-      <h2>Locker <span id="access-locker-id"></span> Sedang Disewa</h2>
-      <p class="hint">Kalau ini locker kamu, masukkan kode unik untuk membukanya.</p>
+      <h2>Locker <span id="access-locker-id"></span> <span id="access-status-label">Sedang Disewa</span></h2>
+      <p id="access-hint" class="hint">Kalau ini locker kamu, masukkan kode unik untuk membukanya.</p>
       <form id="form-access">
         <label>
           Kode Unik
@@ -113,13 +114,21 @@
     <!-- ===================== PILIHAN LANJUT / AKHIRI ===================== -->
     <section id="screen-access-choice" class="screen">
       <div class="icon-success">✓</div>
-      <h2>Locker Terbuka</h2>
-      <p class="hint">Mau apa selanjutnya?</p>
+      <h2>Perintah Membuka Locker Terkirim</h2>
+      <p id="choice-hint" class="hint">Mau apa selanjutnya?</p>
       <p id="choice-error" class="error-text" hidden></p>
       <div class="choice-buttons">
         <button class="btn-primary" data-action="choice-continue">Buka &amp; Lanjut Sewa</button>
         <button class="btn-secondary" data-action="choice-end">Ambil Barang &amp; Akhiri Sewa</button>
       </div>
+    </section>
+
+    <!-- ===================== MENUNGGU PINTU DITUTUP ===================== -->
+    <section id="screen-session-ending" class="screen">
+      <div class="icon-warning">…</div>
+      <h2>Menunggu Pintu Ditutup</h2>
+      <p id="ending-status" class="hint">Perintah diterima. Sewa baru selesai setelah sistem memastikan pintu locker tertutup.</p>
+      <button class="btn-secondary" data-action="back-to-scanner">Kembali ke Scanner</button>
     </section>
 
     <!-- ===================== SESI SELESAI ===================== -->
