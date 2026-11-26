@@ -26,7 +26,7 @@ function showScreen(id) {
   document.getElementById(id).classList.add("active");
 }
 
-function backToScanner() {
+function backToHome() {
   stopSessionTimer();
   state.lockerId = null;
   state.lockerStatus = null;
@@ -35,16 +35,14 @@ function backToScanner() {
   state.uniqueCode = null;
   state.startedAt = null;
   const currentUrl = new URL(window.location.href);
-  const pathParts = currentUrl.pathname.split("/").filter(Boolean);
-  if (currentUrl.searchParams.has("token") && pathParts.length > 0) {
-    pathParts.pop();
-    currentUrl.pathname = `/${pathParts.join("/")}${pathParts.length ? "/" : ""}`;
+  if (currentUrl.searchParams.has("token")) {
+    currentUrl.pathname = "/";
     currentUrl.search = "";
     currentUrl.hash = "";
     window.history.replaceState(null, "", currentUrl.href);
   }
-  showScreen("screen-scanner");
-  startCamera();
+  document.getElementById("page-error").hidden = true;
+  showScreen("screen-home");
 }
 
 // === HELPER: fetch dengan timeout ===
@@ -64,161 +62,23 @@ async function fetchWithTimeout(url, options = {}) {
   }
 }
 
-// ============================================================
-// CAMERA + QR SCANNING
-// ============================================================
-let videoStream = null;
-let scanLoopHandle = null;
-let scanBusy = false;    // true selama payload divalidasi ke server
-let cameraSession = 0;   // penanda agar startCamera yang tertunda bisa dibatalkan
-
-const kScanIntervalMs = 120;     // ~8 pemindaian/detik sudah cukup untuk QR
-const kScanMaxWidth = 1280;      // frame lebih lebar di-downscale sebelum decode
-const kRescanCooldownMs = 2000;  // jeda agar QR yang sama tidak langsung terbaca ulang
-
-function setScanStatus(msg) {
-  const el = document.getElementById("scan-status");
-  if (!el) return;
-  el.textContent = msg || "";
-  el.hidden = !msg;
-}
-
-function cameraErrorMessage(err) {
-  switch (err && err.name) {
-    case "NotAllowedError":
-    case "SecurityError":
-      return "Izin kamera ditolak. Aktifkan izin kamera di pengaturan browser lalu muat ulang halaman.";
-    case "NotFoundError":
-    case "DevicesNotFoundError":
-      return "Kamera tidak ditemukan di perangkat ini.";
-    case "NotReadableError":
-    case "TrackStartError":
-      return "Kamera sedang dipakai aplikasi lain. Tutup aplikasi itu lalu coba lagi.";
-    default:
-      return "Tidak bisa mengakses kamera. Pastikan izin kamera diaktifkan.";
-  }
-}
-
-async function startCamera() {
-  const video = document.getElementById("camera-video");
-  const errorEl = document.getElementById("camera-error");
-  errorEl.hidden = true;
-  setScanStatus("");
-
-  stopCamera(); // cegah stream ganda
-  const session = cameraSession;
-  scanBusy = false;
-
-  // Pustaka jsQR dari CDN harus sudah termuat
-  if (typeof jsQR === "undefined") {
-    errorEl.textContent =
-      "Pemindai QR gagal dimuat. Cek koneksi internet lalu muat ulang halaman.";
-    errorEl.hidden = false;
-    return;
-  }
-
-  // getUserMedia butuh secure context (HTTPS, localhost, atau 127.0.0.1)
-  if (!window.isSecureContext || !navigator.mediaDevices ||
-      !navigator.mediaDevices.getUserMedia) {
-    errorEl.textContent =
-      "Kamera butuh HTTPS (atau localhost). Buka halaman ini lewat HTTPS.";
-    errorEl.hidden = false;
-    return;
-  }
-
+async function readResponseJson(res) {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: "environment" },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-      },
-      audio: false,
-    });
-    if (session !== cameraSession) {
-      // Kamera sudah dihentikan/diganti selagi menunggu izin
-      stream.getTracks().forEach((t) => t.stop());
-      return;
+    const data = await res.json();
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      throw new Error("Respons layanan tidak dapat dibaca. Coba lagi.");
     }
-    videoStream = stream;
-    video.srcObject = stream;
-    await video.play();
-    if (session !== cameraSession) return;
-    scanLoop();
-  } catch (err) {
-    if (session !== cameraSession) return;
-    errorEl.textContent = cameraErrorMessage(err);
-    errorEl.hidden = false;
+    return data;
+  } catch {
+    if (!res.ok) return {};
+    throw new Error("Respons layanan tidak dapat dibaca. Coba lagi.");
   }
-}
-
-function stopCamera() {
-  cameraSession++; // batalkan startCamera yang masih menunggu
-  if (scanLoopHandle) clearTimeout(scanLoopHandle);
-  scanLoopHandle = null;
-  if (videoStream) {
-    videoStream.getTracks().forEach((t) => t.stop());
-    videoStream = null;
-  }
-  const video = document.getElementById("camera-video");
-  if (video) video.srcObject = null;
-}
-
-function scanLoop() {
-  if (scanLoopHandle) return; // sudah berjalan, jangan dobel
-  const video = document.getElementById("camera-video");
-  const canvas = document.getElementById("camera-canvas");
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-
-  function tick() {
-    scanLoopHandle = null;
-    if (!videoStream || scanBusy) return; // berhenti; dilanjutkan oleh resumeScanning()
-
-    if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
-      const scale = Math.min(1, kScanMaxWidth / video.videoWidth);
-      const w = Math.round(video.videoWidth * scale);
-      const h = Math.round(video.videoHeight * scale);
-      // Ubah ukuran canvas hanya kalau perlu (mengubahnya mereset canvas)
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w;
-        canvas.height = h;
-      }
-      ctx.drawImage(video, 0, 0, w, h);
-      const imageData = ctx.getImageData(0, 0, w, h);
-      // QR di layar locker: modul hitam di latar putih, jadi tidak perlu coba inversi
-      const code = jsQR(imageData.data, w, h, { inversionAttempts: "dontInvert" });
-      if (code && code.data) {
-        handleScannedPayload(code.data);
-        return;
-      }
-    }
-    scanLoopHandle = setTimeout(tick, kScanIntervalMs);
-  }
-  scanLoopHandle = setTimeout(tick, kScanIntervalMs);
-}
-
-// Lanjut memindai setelah jeda singkat (kamera tetap menyala)
-function resumeScanning() {
-  scanBusy = true;
-  setTimeout(() => {
-    if (!videoStream) return; // kamera sudah dihentikan (pindah layar)
-    scanBusy = false;
-    setScanStatus("");
-    scanLoop();
-  }, kRescanCooldownMs);
-}
-
-// Pindah dari scanner ke layar lain: matikan kamera + status
-function leaveScanner(screenId) {
-  stopCamera();
-  setScanStatus("");
-  showScreen(screenId);
 }
 
 // === QR PAYLOAD PARSER ===
 // QR firmware berisi link frontend dengan identitas locker dan token dinamis.
 function handleScannedPayload(raw) {
-  document.getElementById("camera-error").hidden = true;
+  document.getElementById("page-error").hidden = true;
 
   const payload = String(raw).trim();
   let lockerId;
@@ -247,21 +107,46 @@ function handleScannedPayload(raw) {
   }
 
   if (!lockerId || !token) {
-    showError("QR tidak valid. Pastikan scan QR di layar locker.");
-    resumeScanning();
+    showError("Tautan QR tidak lengkap. Pindai QR pada locker sekali lagi.");
     return;
   }
 
-  scanBusy = true; // hentikan decode; kamera tetap tampil selama server memeriksa
-  setScanStatus("Memeriksa QR…");
   validateAndFetchStatus(lockerId, token);
 }
 
 // === SCREEN: error generik ===
 function showError(msg) {
-  const errorEl = document.getElementById("camera-error");
+  const errorEl = document.getElementById("page-error");
   errorEl.textContent = msg;
   errorEl.hidden = false;
+  showScreen("screen-home");
+}
+
+function customerErrorMessage(data, status, fallback) {
+  const code = data.code || data.message;
+  const messages = {
+    TOKEN_MISSING: "Tautan QR tidak lengkap. Pindai QR pada locker sekali lagi.",
+    TOKEN_EXPIRED: "QR sudah diperbarui. Pindai QR terbaru pada locker.",
+    LOCKER_NOT_FOUND: "Locker tidak ditemukan. Pastikan kamu membuka QR yang benar.",
+    LOCKER_NOT_EMPTY: "Locker sudah digunakan. Silakan pilih locker lain.",
+    LOCKER_NOT_OCCUPIED:
+      "Sewa locker ini sudah tidak aktif. Pindai QR lagi atau minta bantuan petugas.",
+    NO_ACTIVE_RENTAL: "Sesi sewa tidak ditemukan. Minta bantuan petugas locker.",
+    RENTAL_NOT_FOUND: "Data sewa tidak ditemukan. Minta bantuan petugas locker.",
+    INVALID_CODE: "Kode tidak cocok. Periksa kembali kode unik kamu.",
+    ACTION_INVALID: "Permintaan ini tidak dapat diproses. Coba lagi.",
+    SERVER_ERROR: "Layanan sedang bermasalah. Coba lagi beberapa saat.",
+  };
+
+  if (status === 429) {
+    return "Terlalu banyak percobaan. Tunggu sebentar sebelum mencoba lagi.";
+  }
+  if (status >= 500) {
+    return messages.SERVER_ERROR;
+  }
+  return Object.prototype.hasOwnProperty.call(messages, code)
+    ? messages[code]
+    : fallback;
 }
 
 // ============================================================
@@ -278,26 +163,23 @@ async function validateAndFetchStatus(lockerId, token) {
     );
 
     // Respons non-JSON (mis. halaman error dari proxy) tidak boleh membuat crash
-    const data = await res.json().catch(() => ({}));
+    const data = await readResponseJson(res);
 
     // Handle error responses
     if (!res.ok) {
       if (data.code === "TOKEN_EXPIRED") {
-        leaveScanner("screen-expired");
+        showScreen("screen-expired");
         return;
       }
       if (data.code === "TOKEN_MISSING") {
-        showError("QR tidak valid. Scan ulang.");
-        resumeScanning();
+        showError(customerErrorMessage(data, res.status, "Tautan QR tidak lengkap."));
         return;
       }
-      if (res.status === 404) {
-        showError("Locker tidak ditemukan.");
-        resumeScanning();
-        return;
-      }
-      showError(data.message || "Gagal memuat status locker.");
-      resumeScanning();
+      showError(customerErrorMessage(
+        data,
+        res.status,
+        "Status locker belum dapat dimuat. Coba pindai QR lagi.",
+      ));
       return;
     }
 
@@ -306,26 +188,24 @@ async function validateAndFetchStatus(lockerId, token) {
     document.getElementById("access-locker-id").textContent = lockerId;
     state.lockerStatus = data.status;
     document.getElementById("access-status-label").textContent =
-      data.status === "needs_attention" ? "Perlu Perhatian" : "Sedang Disewa";
+      data.status === "needs_attention" ? "perlu diperiksa" : "sedang disewa";
     document.getElementById("access-hint").textContent =
       data.status === "needs_attention"
-        ? "Locker ini tidak bisa disewa baru. Masukkan kode unik untuk mengambil barang dan mengakhiri sewa."
-        : "Kalau ini locker kamu, masukkan kode unik untuk membukanya.";
+        ? "Locker ini tidak dapat disewa. Masukkan kode unik untuk mengambil barang dan mengakhiri sewa."
+        : "Masukkan kode unik untuk membuka locker dan mengambil barangmu.";
 
     // Render beda screen tergantung status
     if (data.status === "empty") {
-      leaveScanner("screen-rent-form");
+      showScreen("screen-rent-form");
     } else if (data.status === "occupied") {
-      leaveScanner("screen-access-code");
+      showScreen("screen-access-code");
     } else if (data.status === "needs_attention") {
-      leaveScanner("screen-needs-attention");
+      showScreen("screen-needs-attention");
     } else {
-      showError("Status locker tidak dikenali.");
-      resumeScanning();
+      showError("Status locker belum dapat ditampilkan. Coba pindai QR lagi.");
     }
   } catch (err) {
-    showError(err.message);
-    resumeScanning();
+    showError(err.message || "Layanan sedang bermasalah. Coba lagi beberapa saat.");
   }
 }
 
@@ -359,7 +239,7 @@ document.getElementById("form-rent").addEventListener("submit", async (e) => {
       body: JSON.stringify({ nama, no_hp: noHp, token: state.token }),
     });
 
-    const data = await res.json();
+    const data = await readResponseJson(res);
 
     if (!res.ok) {
       if (data.code === "TOKEN_EXPIRED") {
@@ -367,16 +247,19 @@ document.getElementById("form-rent").addEventListener("submit", async (e) => {
         return;
       }
       if (res.status === 409) {
-        errorEl.textContent = "Locker sudah terisi orang lain. Scan ulang.";
+        errorEl.textContent = customerErrorMessage(
+          data,
+          res.status,
+          "Locker sudah digunakan orang lain. Pindai QR terbaru untuk mencoba lagi.",
+        );
         errorEl.hidden = false;
         return;
       }
-      if (res.status === 429) {
-        errorEl.textContent = "Terlalu banyak percobaan, coba lagi nanti.";
-        errorEl.hidden = false;
-        return;
-      }
-      errorEl.textContent = data.message || "Gagal memproses sewa.";
+      errorEl.textContent = customerErrorMessage(
+        data,
+        res.status,
+        "Sewa belum dapat diproses. Coba lagi beberapa saat.",
+      );
       errorEl.hidden = false;
       return;
     }
@@ -441,25 +324,14 @@ document.getElementById("form-access").addEventListener("submit", async (e) => {
       body: JSON.stringify({ code, action: "continue" }),
     });
 
-    const data = await res.json();
+    const data = await readResponseJson(res);
 
     if (!res.ok) {
-      if (res.status === 400) {
-        errorEl.textContent = "Kode tidak valid.";
-        errorEl.hidden = false;
-        return;
-      }
-      if (res.status === 429) {
-        errorEl.textContent = "Terlalu banyak percobaan, locker dikunci sementara.";
-        errorEl.hidden = false;
-        return;
-      }
-      if (res.status === 409) {
-        errorEl.textContent = "Locker tidak dalam status disewa.";
-        errorEl.hidden = false;
-        return;
-      }
-      errorEl.textContent = data.message || "Gagal membuka locker.";
+      errorEl.textContent = customerErrorMessage(
+        data,
+        res.status,
+        "Locker belum dapat dibuka. Periksa kode atau minta bantuan petugas.",
+      );
       errorEl.hidden = false;
       return;
     }
@@ -478,11 +350,11 @@ document.getElementById("form-access").addEventListener("submit", async (e) => {
     const choiceHint = document.getElementById("choice-hint");
     continueButton.hidden = state.lockerStatus === "needs_attention";
     choiceHint.textContent = state.lockerStatus === "needs_attention"
-      ? "Locker perlu diperiksa. Ambil barang dan akhiri sewa."
-      : "Mau apa selanjutnya?";
+      ? "Locker perlu diperiksa. Ambil barang lalu akhiri sewa."
+      : "Pilih untuk melanjutkan sewa atau mengakhiri sewa setelah mengambil barang.";
     showScreen("screen-access-choice");
   } catch (err) {
-    errorEl.textContent = err.message;
+    errorEl.textContent = err.message || "Layanan sedang bermasalah. Coba lagi.";
     errorEl.hidden = false;
   } finally {
     submitBtn.disabled = false;
@@ -506,13 +378,12 @@ document.querySelector('[data-action="choice-end"]').addEventListener("click", a
   errorEl.hidden = true;
 
   if (!state.uniqueCode) {
-    errorEl.textContent = "Kode unik tidak tersedia. Scan ulang QR dan masukkan kode lagi.";
+    errorEl.textContent = "Kode unik tidak tersedia. Pindai QR locker dan masukkan kode lagi.";
     errorEl.hidden = false;
     return;
   }
 
-  // Kirim action "end" ke backend. Jangan tampilkan "Sewa Selesai" kalau gagal,
-  // karena sewa masih berjalan di backend.
+  // Tampilkan status selesai hanya setelah sistem mengonfirmasi pintu tertutup.
   endButton.disabled = true;
   try {
     const res = await fetchWithTimeout(`${kApiBaseUrl}/lockers/${state.lockerId}/access`, {
@@ -520,17 +391,18 @@ document.querySelector('[data-action="choice-end"]').addEventListener("click", a
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code: state.uniqueCode, action: "end" }),
     });
-    const data = await res.json().catch(() => ({}));
+    const data = await readResponseJson(res);
     if (!res.ok) {
-      errorEl.textContent =
-        res.status === 400
-          ? "Kode tidak valid. Scan ulang dan masukkan kode lagi."
-          : data.message || "Gagal mengakhiri sewa.";
+      errorEl.textContent = customerErrorMessage(
+        data,
+        res.status,
+        "Sewa belum dapat diakhiri. Coba lagi atau minta bantuan petugas.",
+      );
       errorEl.hidden = false;
       return;
     }
   } catch (err) {
-    errorEl.textContent = err.message;
+    errorEl.textContent = err.message || "Layanan sedang bermasalah. Coba lagi.";
     errorEl.hidden = false;
     return;
   } finally {
@@ -539,8 +411,8 @@ document.querySelector('[data-action="choice-end"]').addEventListener("click", a
 
   const endingStatus = document.getElementById("ending-status");
   endingStatus.textContent = state.rentalId
-    ? "Perintah diterima. Sewa akan selesai setelah pintu tertutup dan backend mengonfirmasi statusnya."
-    : "Perintah diterima. Sewa baru selesai setelah pintu tertutup; konfirmasi status tidak tersedia di perangkat ini.";
+    ? "Permintaan diterima. Pastikan pintu tertutup; status sewa akan diperbarui otomatis setelah locker terkonfirmasi."
+    : "Permintaan diterima. Pastikan pintu tertutup. Status sewa belum dapat diperiksa dari perangkat ini; hubungi petugas jika belum berubah.";
   showScreen("screen-session-ending");
   if (state.rentalId) startSessionTimer();
 });
@@ -607,7 +479,7 @@ async function pollRentalStatus() {
     const res = await fetchWithTimeout(`${kApiBaseUrl}/rentals/${state.rentalId}/status`);
     if (!res.ok) throw new Error("Polling failed");
 
-    const data = await res.json();
+    const data = await readResponseJson(res);
 
     if (data.rental_status === "completed") {
       // Sesi selesai — tampil durasi akhir
@@ -628,7 +500,7 @@ async function pollRentalStatus() {
   } catch (err) {
     if (document.getElementById("screen-session-ending").classList.contains("active")) {
       document.getElementById("ending-status").textContent =
-        "Permintaan diterima; masih menunggu pintu tertutup. Belum dapat memverifikasi penyelesaian sewa.";
+        "Permintaan diterima. Sistem belum dapat memastikan pintu sudah tertutup. Status akan diperbarui otomatis setelah konfirmasi tersedia.";
       return;
     }
 
@@ -652,10 +524,10 @@ function formatDuration(totalSeconds) {
 }
 
 // ============================================================
-// BACK TO SCANNER BUTTONS
+// Kembali ke halaman awal untuk memindai QR dengan kamera ponsel.
 // ============================================================
-document.querySelectorAll('[data-action="back-to-scanner"]').forEach((btn) => {
-  btn.addEventListener("click", backToScanner);
+document.querySelectorAll('[data-action="back-to-home"]').forEach((btn) => {
+  btn.addEventListener("click", backToHome);
 });
 document.querySelector('[data-action="go-to-session"]').addEventListener("click", () => {
   document.getElementById("session-locker-id").textContent = state.lockerId;
@@ -663,9 +535,9 @@ document.querySelector('[data-action="go-to-session"]').addEventListener("click"
   startSessionTimer();
 });
 document.querySelector('[data-action="attention-access"]').addEventListener("click", () => {
-  document.getElementById("access-status-label").textContent = "Perlu Perhatian";
+  document.getElementById("access-status-label").textContent = "perlu diperiksa";
   document.getElementById("access-hint").textContent =
-    "Locker ini tidak bisa disewa baru. Masukkan kode unik untuk mengambil barang dan mengakhiri sewa.";
+    "Locker ini tidak dapat disewa. Masukkan kode unik untuk mengambil barang dan mengakhiri sewa.";
   showScreen("screen-access-code");
 });
 
@@ -678,7 +550,6 @@ if (new URLSearchParams(location.search).get("dev") === "1") {
 
   document.querySelectorAll("[data-sim]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      stopCamera();
       const sim = btn.dataset.sim;
       if (sim === "expired") {
         showScreen("screen-expired");
@@ -722,7 +593,4 @@ if (openedFromLockerQr) {
   document.getElementById("session-locker-id").textContent = state.lockerId;
   showScreen("screen-session-active");
   startSessionTimer();
-} else {
-  // Default: scanner
-  startCamera();
 }

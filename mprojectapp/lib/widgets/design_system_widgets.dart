@@ -70,7 +70,7 @@ class DesignMetricCard extends StatelessWidget {
       style: AppType.caption.copyWith(
         color: highlighted ? style.text : AppColors.neutralTextMuted,
       ),
-      maxLines: 1,
+      maxLines: 2,
       overflow: TextOverflow.ellipsis,
     );
     final valueWidget = Text(

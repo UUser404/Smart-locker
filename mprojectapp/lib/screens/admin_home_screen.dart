@@ -260,19 +260,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
             screenClassOf(constraints.maxWidth) == ScreenClass.expanded;
         if (isExpanded) {
           return Scaffold(
-            body: Row(
-              children: [
-                SizedBox(
-                  width: AppSize.sidebar,
-                  child: _AdminSidebar(
-                    selectedIndex: _webIndex,
-                    destinations: _webDestinations,
-                    name: widget.session.nama,
-                    onSelected: (index) => setState(() => _webIndex = index),
+            body: SafeArea(
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: AppSize.sidebar,
+                    child: _AdminSidebar(
+                      selectedIndex: _webIndex,
+                      destinations: _webDestinations,
+                      name: widget.session.nama,
+                      onSelected: (index) => setState(() => _webIndex = index),
+                    ),
                   ),
-                ),
-                Expanded(child: _selectedWebPage()),
-              ],
+                  Expanded(child: _selectedWebPage()),
+                ],
+              ),
             ),
           );
         }
@@ -339,8 +341,8 @@ class _AdminSidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
               AppSpace.s6,
               AppSpace.s6,
               AppSpace.s4,
@@ -351,18 +353,15 @@ class _AdminSidebar extends StatelessWidget {
               children: [
                 Text(
                   'Smart Locker',
-                  style: TextStyle(
+                  style: AppType.title.copyWith(
                     color: AppColors.neutralOnInverse,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
                   ),
                 ),
                 SizedBox(height: AppSpace.s1),
                 Text(
                   'Admin Console',
-                  style: TextStyle(
+                  style: AppType.overline.copyWith(
                     color: AppColors.neutralOnInverseMuted,
-                    fontSize: 11,
                   ),
                 ),
               ],
