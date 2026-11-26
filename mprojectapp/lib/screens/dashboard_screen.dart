@@ -270,7 +270,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         content: Text(body),
         duration: const Duration(seconds: 5),
         backgroundColor: isReminder
-            ? AppColors.warningMain
+            ? AppColors.warningStrong
             : AppColors.dangerMain,
         action: SnackBarAction(
           label: 'Lihat',
@@ -927,7 +927,7 @@ class _AttentionCard extends StatelessWidget {
                     ),
                     child: const Icon(
                       Icons.warning_amber_rounded,
-                      color: AppColors.warningMain,
+                      color: AppColors.warningText,
                     ),
                   ),
                   const SizedBox(width: AppSpace.s2),
@@ -976,7 +976,7 @@ class _AttentionCard extends StatelessWidget {
               child: FilledButton(
                 onPressed: onHandle,
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.warningMain,
+                  backgroundColor: AppColors.warningStrong,
                   foregroundColor: AppColors.neutralOnInverse,
                 ),
                 child: const Text('Tangani sekarang'),

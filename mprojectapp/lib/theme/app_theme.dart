@@ -120,13 +120,13 @@ ThemeData buildAppTheme() {
     colorScheme: scheme,
     scaffoldBackgroundColor: AppColors.neutralBg,
     textTheme: textTheme,
-    appBarTheme: const AppBarTheme(
+    appBarTheme: AppBarTheme(
       backgroundColor: AppColors.neutralBg,
       foregroundColor: AppColors.neutralInk,
       elevation: 0,
       scrolledUnderElevation: 0,
       toolbarHeight: AppSize.appBar,
-      titleTextStyle: AppType.title,
+      titleTextStyle: AppType.title.copyWith(color: AppColors.neutralInk),
     ),
     cardTheme: CardThemeData(
       color: AppColors.neutralSurface,
@@ -159,7 +159,7 @@ ThemeData buildAppTheme() {
         horizontal: AppSpace.s4,
         vertical: AppSpace.s3,
       ),
-      hintStyle: AppType.bodySm.copyWith(color: AppColors.neutralTextDisabled),
+      hintStyle: AppType.bodySm.copyWith(color: AppColors.neutralTextMuted),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.field),
         borderSide: const BorderSide(color: AppColors.neutralBorder),

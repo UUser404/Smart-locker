@@ -12,7 +12,7 @@ abstract final class AppColors {
   static const neutralBorderStrong = Color(0xFFCBD5E1);
   static const neutralInk = Color(0xFF0F172A);
   static const neutralTextBody = Color(0xFF475569);
-  static const neutralTextMuted = Color(0xFF64748B);
+  static const neutralTextMuted = Color(0xFF5F6B7A);
   static const neutralTextDisabled = Color(0xFF94A3B8);
   static const neutralInverse = Color(0xFF0F172A);
   static const neutralInverseRaised = Color(0xFF1E293B);

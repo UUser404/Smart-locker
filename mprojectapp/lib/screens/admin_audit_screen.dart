@@ -22,13 +22,15 @@ class AdminAuditScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Log Audit'),
+            const Text('Log Audit'),
             Text(
               'Tindakan sistem dan pengguna',
-              style: TextStyle(fontSize: 12, color: AppColors.neutralTextMuted),
+              style: AppType.caption.copyWith(
+                color: AppColors.neutralTextMuted,
+              ),
             ),
           ],
         ),
