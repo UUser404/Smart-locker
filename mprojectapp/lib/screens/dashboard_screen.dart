@@ -49,6 +49,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool _handlingExpiredSession = false;
   int _selectedTab = 0;
 
+  static const _navigationDestinations = [
+    _PetugasDestination(Icons.grid_view_outlined, 'Locker'),
+    _PetugasDestination(Icons.history_outlined, 'Riwayat'),
+    _PetugasDestination(Icons.person_outline, 'Akun'),
+  ];
+
   // Anti spam snackbar: track locker yang sudah di-snackbar pada sesi ini.
   // Reset saat locker keluar dari needs_attention.
   final Set<String> _snackbarShownFor = {};
@@ -398,64 +404,103 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _selectedTab == 0
-                  ? 'Smart Locker'
-                  : _selectedTab == 1
-                  ? 'Riwayat'
-                  : 'Akun',
-              style: AppType.title,
-            ),
-            Text(
-              _selectedTab == 0
-                  ? 'Petugas · ${widget.session.nama}'
-                  : 'Petugas',
-              style: AppType.caption.copyWith(
-                color: AppColors.neutralTextMuted,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isExpanded =
+            screenClassOf(constraints.maxWidth) == ScreenClass.expanded;
+        if (isExpanded) {
+          return Scaffold(
+            body: SafeArea(
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: AppSize.sidebar,
+                    child: _PetugasSidebar(
+                      selectedIndex: _selectedTab,
+                      destinations: _navigationDestinations,
+                      name: widget.session.nama,
+                      onSelected: _selectTab,
+                    ),
+                  ),
+                  Expanded(
+                    child: Scaffold(
+                      appBar: _buildAppBar(),
+                      body: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxWidth: AppSize.contentMax,
+                          ),
+                          child: _buildSelectedBody(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-        actions: [
-          if (_selectedTab != 2)
-            IconButton(
-              onPressed: _selectedTab == 1 ? _loadAuditHistory : _loadLockers,
-              icon: const Icon(Icons.refresh),
-              tooltip: 'Muat ulang',
-            ),
-        ],
-      ),
-      body: _buildSelectedBody(),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedTab,
-        onDestinationSelected: (index) {
-          setState(() => _selectedTab = index);
-          if (index == 1) unawaited(_loadAuditHistory());
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.grid_view_outlined),
-            selectedIcon: Icon(Icons.grid_view_rounded),
-            label: 'Locker',
+          );
+        }
+
+        return Scaffold(
+          appBar: _buildAppBar(),
+          body: _buildSelectedBody(),
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: _selectedTab,
+            onDestinationSelected: _selectTab,
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.grid_view_outlined),
+                selectedIcon: Icon(Icons.grid_view_rounded),
+                label: 'Locker',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.history_outlined),
+                selectedIcon: Icon(Icons.history),
+                label: 'Riwayat',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline),
+                selectedIcon: Icon(Icons.person),
+                label: 'Akun',
+              ),
+            ],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history),
-            label: 'Riwayat',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Akun',
-          ),
-        ],
-      ),
+        );
+      },
     );
+  }
+
+  AppBar _buildAppBar() => AppBar(
+    title: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _selectedTab == 0
+              ? 'Smart Locker'
+              : _selectedTab == 1
+              ? 'Riwayat'
+              : 'Akun',
+          style: AppType.title,
+        ),
+        Text(
+          _selectedTab == 0 ? 'Petugas · ${widget.session.nama}' : 'Petugas',
+          style: AppType.caption.copyWith(color: AppColors.neutralTextMuted),
+        ),
+      ],
+    ),
+    actions: [
+      if (_selectedTab != 2)
+        IconButton(
+          onPressed: _selectedTab == 1 ? _loadAuditHistory : _loadLockers,
+          icon: const Icon(Icons.refresh),
+          tooltip: 'Muat ulang',
+        ),
+    ],
+  );
+
+  void _selectTab(int index) {
+    setState(() => _selectedTab = index);
+    if (index == 1) unawaited(_loadAuditHistory());
   }
 
   int _countByStatus(LockerStatus s) =>
@@ -534,9 +579,9 @@ class _DashboardScreenState extends State<DashboardScreen>
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: _lockers.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            mainAxisExtent: 156,
+            mainAxisExtent: 156 * MediaQuery.textScalerOf(context).scale(1),
             crossAxisSpacing: AppSpace.s3,
             mainAxisSpacing: AppSpace.s2,
           ),
@@ -568,13 +613,17 @@ class _DashboardScreenState extends State<DashboardScreen>
               const SizedBox(height: AppSpace.s4),
               LayoutBuilder(
                 builder: (context, constraints) {
+                  final textScale = MediaQuery.textScalerOf(context).scale(1);
+                  final baseAspectRatio = constraints.maxWidth >= 700
+                      ? 2.4
+                      : 1.55;
                   return GridView.count(
-                    crossAxisCount: 3,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     mainAxisSpacing: AppSpace.s2,
                     crossAxisSpacing: AppSpace.s2,
-                    childAspectRatio: constraints.maxWidth >= 700 ? 2.4 : 1.25,
+                    crossAxisCount: constraints.maxWidth >= 700 ? 3 : 2,
+                    childAspectRatio: baseAspectRatio / textScale,
                     children: [
                       DesignMetricCard(
                         label: 'Kosong',
@@ -709,6 +758,121 @@ class _DashboardScreenState extends State<DashboardScreen>
           label: const Text('Keluar'),
         ),
       ],
+    );
+  }
+}
+
+class _PetugasDestination {
+  const _PetugasDestination(this.icon, this.label);
+
+  final IconData icon;
+  final String label;
+}
+
+class _PetugasSidebar extends StatelessWidget {
+  const _PetugasSidebar({
+    required this.selectedIndex,
+    required this.destinations,
+    required this.name,
+    required this.onSelected,
+  });
+
+  final int selectedIndex;
+  final List<_PetugasDestination> destinations;
+  final String name;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: AppColors.neutralInverse,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpace.s6,
+              AppSpace.s6,
+              AppSpace.s4,
+              AppSpace.s8,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Smart Locker',
+                  style: AppType.title.copyWith(
+                    color: AppColors.neutralOnInverse,
+                  ),
+                ),
+                SizedBox(height: AppSpace.s1),
+                Text(
+                  'Ruang Petugas',
+                  style: AppType.caption.copyWith(
+                    color: AppColors.neutralOnInverseMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          for (var index = 0; index < destinations.length; index++)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpace.s2,
+                vertical: AppSpace.s1,
+              ),
+              child: ListTile(
+                selected: selectedIndex == index,
+                selectedTileColor: AppColors.brandPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.field),
+                ),
+                leading: Icon(
+                  destinations[index].icon,
+                  color: selectedIndex == index
+                      ? AppColors.neutralOnInverse
+                      : AppColors.neutralOnInverseMuted,
+                ),
+                title: Text(
+                  destinations[index].label,
+                  style: TextStyle(
+                    color: selectedIndex == index
+                        ? AppColors.neutralOnInverse
+                        : AppColors.neutralOnInverseMuted,
+                    fontWeight: selectedIndex == index
+                        ? FontWeight.w800
+                        : FontWeight.w600,
+                  ),
+                ),
+                onTap: () => onSelected(index),
+              ),
+            ),
+          const Spacer(),
+          const Divider(color: AppColors.neutralInverseRaised),
+          Padding(
+            padding: const EdgeInsets.all(AppSpace.s4),
+            child: Row(
+              children: [
+                const CircleAvatar(
+                  backgroundColor: AppColors.neutralInverseRaised,
+                  child: Icon(Icons.person, color: AppColors.neutralOnInverse),
+                ),
+                const SizedBox(width: AppSpace.s2),
+                Expanded(
+                  child: Text(
+                    name,
+                    style: const TextStyle(
+                      color: AppColors.neutralOnInverse,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

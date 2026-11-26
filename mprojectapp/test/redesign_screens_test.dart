@@ -43,21 +43,24 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: AdminAnalyticsScreen(
-          stats: RentalStats(totalRentals: 1, avgDurationSeconds: 0),
-          rentals: [
-            RentalRecord(
-              rentalId: 'R-001',
-              lockerId: 'locker_01',
-              nama: 'Budi Santoso',
-              noHp: '0812****7890',
-              startedAt: DateTime.now(),
-            ),
-          ],
-          lockers: const [],
-          loading: false,
-          error: null,
-          onRefresh: () async {},
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
+          child: AdminAnalyticsScreen(
+            stats: RentalStats(totalRentals: 1, avgDurationSeconds: 0),
+            rentals: [
+              RentalRecord(
+                rentalId: 'R-001',
+                lockerId: 'locker_01',
+                nama: 'Budi Santoso',
+                noHp: '0812****7890',
+                startedAt: DateTime.now(),
+              ),
+            ],
+            lockers: const [],
+            loading: false,
+            error: null,
+            onRefresh: () async {},
+          ),
         ),
       ),
     );

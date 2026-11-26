@@ -161,7 +161,7 @@ class AdminAnalyticsScreen extends StatelessWidget {
         ),
         const SizedBox(height: AppSpace.s4),
       ],
-      _metricsGrid(columns: 2),
+      _metricsGrid(context, columns: 2),
       const SizedBox(height: AppSpace.s6),
       DesignSectionHeader(
         title: 'Status locker',
@@ -225,7 +225,7 @@ class AdminAnalyticsScreen extends StatelessWidget {
         ),
         const SizedBox(height: AppSpace.s4),
       ],
-      _metricsGrid(columns: 4),
+      _metricsGrid(context, columns: 4),
       const SizedBox(height: AppSpace.s6),
       Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,7 +291,7 @@ class AdminAnalyticsScreen extends StatelessWidget {
     ];
   }
 
-  Widget _metricsGrid({required int columns}) {
+  Widget _metricsGrid(BuildContext context, {required int columns}) {
     final attentionCount = _count(LockerStatus.needsAttention);
     final now = DateTime.now();
     final todayRentalCount = rentals.where((rental) {
@@ -304,7 +304,7 @@ class AdminAnalyticsScreen extends StatelessWidget {
     return GridView(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: columns,
-        mainAxisExtent: 108,
+        mainAxisExtent: 120 * MediaQuery.textScalerOf(context).scale(1),
         mainAxisSpacing: AppSpace.s2,
         crossAxisSpacing: AppSpace.s2,
       ),
