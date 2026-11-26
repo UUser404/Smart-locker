@@ -468,7 +468,7 @@ class _AttentionBanner extends StatelessWidget {
                 ),
                 child: const Icon(
                   Icons.warning_amber_rounded,
-                  color: AppColors.warningMain,
+                  color: AppColors.warningText,
                 ),
               ),
               const SizedBox(width: AppSpace.s3),

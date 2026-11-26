@@ -3,6 +3,7 @@ import '../models/session.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/fcm_service.dart';
+import '../theme/app_tokens.dart';
 import 'admin_home_screen.dart';
 import 'dashboard_screen.dart';
 
@@ -72,15 +73,15 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildBranding() {
-    return const Column(
+    return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.lock_outline, size: 48),
-        SizedBox(height: 8),
+        const Icon(Icons.lock_outline, size: 48),
+        const SizedBox(height: 8),
         Text(
           'Masuk sebagai Admin atau Petugas',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: Colors.grey),
+          style: AppType.body.copyWith(color: AppColors.neutralTextBody),
         ),
       ],
     );

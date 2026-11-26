@@ -219,7 +219,7 @@ class LockerSummaryCard extends StatelessWidget {
                   const SizedBox(width: AppSpace.s1),
                   const Icon(
                     Icons.chevron_right,
-                    color: AppColors.neutralTextDisabled,
+                    color: AppColors.neutralTextMuted,
                   ),
                 ],
               ),
@@ -263,7 +263,7 @@ class LockerSummaryCard extends StatelessWidget {
                         color: deviceStatus == null
                             ? AppColors.neutralTextMuted
                             : deviceStatus!.online
-                            ? AppColors.successMain
+                            ? AppColors.successText
                             : AppColors.dangerMain,
                       ),
                       maxLines: 1,
