@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/controller_status.dart';
 import '../models/locker.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_tokens.dart';
@@ -140,12 +141,14 @@ class LockerSummaryCard extends StatelessWidget {
     required this.locker,
     required this.onTap,
     this.tenantName,
+    this.deviceStatus,
     super.key,
   });
 
   final Locker locker;
   final VoidCallback onTap;
   final String? tenantName;
+  final ControllerStatus? deviceStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -253,9 +256,15 @@ class LockerSummaryCard extends StatelessWidget {
                   const SizedBox(width: AppSpace.s2),
                   Expanded(
                     child: Text(
-                      'Status ESP32 belum tersedia dari API',
+                      deviceStatus == null
+                          ? 'ESP32 belum terdaftar'
+                          : 'ESP32 ${deviceStatus!.online ? 'online' : 'offline'}',
                       style: AppType.caption.copyWith(
-                        color: AppColors.neutralTextMuted,
+                        color: deviceStatus == null
+                            ? AppColors.neutralTextMuted
+                            : deviceStatus!.online
+                            ? AppColors.successMain
+                            : AppColors.dangerMain,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -265,6 +274,90 @@ class LockerSummaryCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class ControllerStatusCard extends StatelessWidget {
+  const ControllerStatusCard({
+    required this.devices,
+    required this.loading,
+    this.error,
+    super.key,
+  });
+
+  final List<ControllerStatus> devices;
+  final bool loading;
+  final String? error;
+
+  String _lastSeenLabel(DateTime? lastSeenAt) {
+    if (lastSeenAt == null) return 'Belum pernah tersambung';
+    final seconds = DateTime.now().difference(lastSeenAt).inSeconds;
+    if (seconds < 5) return 'Baru saja';
+    if (seconds < 60) return '$seconds detik lalu';
+    final minutes = (seconds / 60).floor();
+    return '$minutes menit lalu';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpace.s4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Koneksi ESP32', style: AppType.bodyStrong),
+            const SizedBox(height: AppSpace.s2),
+            if (error != null)
+              Text(
+                error!,
+                style: AppType.caption.copyWith(color: AppColors.dangerMain),
+              )
+            else if (devices.isEmpty && loading)
+              const LinearProgressIndicator()
+            else if (devices.isEmpty)
+              Text(
+                'Belum ada ESP32 terdaftar.',
+                style: AppType.caption.copyWith(
+                  color: AppColors.neutralTextMuted,
+                ),
+              )
+            else
+              ...devices.map(
+                (device) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpace.s1),
+                  child: Row(
+                    children: [
+                      Icon(
+                        device.online
+                            ? Icons.wifi_rounded
+                            : Icons.wifi_off_rounded,
+                        size: 18,
+                        color: device.online
+                            ? AppColors.successMain
+                            : AppColors.dangerMain,
+                      ),
+                      const SizedBox(width: AppSpace.s2),
+                      Expanded(
+                        child: Text(
+                          '${device.controllerId} · ${_lastSeenLabel(device.lastSeenAt)}',
+                          style: AppType.caption,
+                        ),
+                      ),
+                      DesignStatusBadge(
+                        label: device.online ? 'Online' : 'Offline',
+                        style: device.online
+                            ? AppStatus.success
+                            : AppStatus.danger,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

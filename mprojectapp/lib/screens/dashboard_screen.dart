@@ -3,12 +3,15 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import '../models/locker.dart';
 import '../models/session.dart';
+import '../models/audit_log_record.dart';
+import '../models/controller_status.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/fcm_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_tokens.dart';
 import '../widgets/design_system_widgets.dart';
+import '../widgets/audit_log_feed.dart';
 import 'login_screen.dart';
 import 'petugas_locker_screens.dart';
 
@@ -32,8 +35,13 @@ class _DashboardScreenState extends State<DashboardScreen>
   late final AuthService _authService;
 
   List<Locker> _lockers = [];
+  List<ControllerStatus> _deviceStatuses = [];
+  List<AuditLogRecord> _auditLogs = [];
   bool _loading = true;
+  bool _auditLoading = false;
   String? _error;
+  String? _deviceError;
+  String? _auditError;
   Timer? _pollTimer;
   StreamSubscription? _fgMessageSub;
   StreamSubscription? _openedAppSub;
@@ -99,6 +107,34 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
+  Future<void> _loadAuditHistory() async {
+    if (!mounted) return;
+    setState(() {
+      _auditLoading = true;
+      _auditError = null;
+    });
+
+    try {
+      final logs = await _api.fetchAuditLogs();
+      if (!mounted) return;
+      setState(() {
+        _auditLogs = logs;
+        _auditLoading = false;
+        _auditError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      if (e is ApiException && e.statusCode == 401) {
+        await _handleExpiredSession();
+        return;
+      }
+      setState(() {
+        _auditLoading = false;
+        _auditError = 'Gagal memuat riwayat: $e';
+      });
+    }
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -129,9 +165,19 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     try {
       final lockers = await _api.fetchLockers();
+      var devices = <ControllerStatus>[];
+      String? deviceError;
+      try {
+        devices = await _api.fetchControllerStatuses();
+      } catch (e) {
+        if (e is ApiException && e.statusCode == 401) rethrow;
+        deviceError = 'Gagal memuat status ESP32: $e';
+      }
       if (!mounted) return;
       setState(() {
         _lockers = lockers;
+        _deviceStatuses = devices;
+        _deviceError = deviceError;
         _loading = false;
         _error = null;
         _lastFetch = DateTime.now();
@@ -277,6 +323,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       MaterialPageRoute<void>(
         builder: (_) => LockerDetailScreen(
           locker: locker,
+          deviceStatus: _deviceStatusFor(locker),
           onHandle: () => _openHandling(locker),
           onEmergencyOpen: (reason, endSession) =>
               _emergencyOpenLocker(locker, reason, endSession),
@@ -377,7 +424,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         actions: [
           if (_selectedTab != 2)
             IconButton(
-              onPressed: () => _loadLockers(),
+              onPressed: _selectedTab == 1 ? _loadAuditHistory : _loadLockers,
               icon: const Icon(Icons.refresh),
               tooltip: 'Muat ulang',
             ),
@@ -386,7 +433,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       body: _buildSelectedBody(),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTab,
-        onDestinationSelected: (index) => setState(() => _selectedTab = index),
+        onDestinationSelected: (index) {
+          setState(() => _selectedTab = index);
+          if (index == 1) unawaited(_loadAuditHistory());
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.grid_view_outlined),
@@ -410,6 +460,13 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   int _countByStatus(LockerStatus s) =>
       _lockers.where((l) => l.status == s).length;
+
+  ControllerStatus? _deviceStatusFor(Locker locker) {
+    for (final device in _deviceStatuses) {
+      if (device.controllerId == locker.controllerId) return device;
+    }
+    return null;
+  }
 
   Widget _buildSelectedBody() {
     if (_loading && _lockers.isEmpty) {
@@ -442,10 +499,12 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     return switch (_selectedTab) {
       0 => _buildLockerHome(),
-      1 => const DesignEmptyState(
-        icon: Icons.history,
-        title: 'Riwayat belum tersedia',
-        message: 'Server belum menyediakan endpoint riwayat tindakan Petugas.',
+      1 => AuditLogFeed(
+        logs: _auditLogs,
+        loading: _auditLoading,
+        error: _auditError,
+        onRefresh: _loadAuditHistory,
+        showActor: false,
       ),
       _ => _buildAccountPage(),
     };
@@ -464,6 +523,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 .map(
                   (locker) => LockerSummaryCard(
                     locker: locker,
+                    deviceStatus: _deviceStatusFor(locker),
                     onTap: () => _openLocker(locker),
                   ),
                 )
@@ -484,6 +544,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             final locker = _lockers[index];
             return LockerSummaryCard(
               locker: locker,
+              deviceStatus: _deviceStatusFor(locker),
               onTap: () => _openLocker(locker),
             );
           },
@@ -499,6 +560,12 @@ class _DashboardScreenState extends State<DashboardScreen>
           child: ListView(
             padding: const EdgeInsets.all(AppSpace.s4),
             children: [
+              ControllerStatusCard(
+                devices: _deviceStatuses,
+                loading: _loading,
+                error: _deviceError,
+              ),
+              const SizedBox(height: AppSpace.s4),
               LayoutBuilder(
                 builder: (context, constraints) {
                   return GridView.count(

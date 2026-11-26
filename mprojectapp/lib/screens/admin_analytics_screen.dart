@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/controller_status.dart';
 import '../models/locker.dart';
 import '../models/rental_record.dart';
 import '../theme/app_theme.dart';
@@ -11,6 +12,8 @@ class AdminAnalyticsScreen extends StatelessWidget {
     required this.stats,
     required this.rentals,
     required this.lockers,
+    this.deviceStatuses = const [],
+    this.deviceError,
     required this.loading,
     required this.error,
     required this.onRefresh,
@@ -21,6 +24,8 @@ class AdminAnalyticsScreen extends StatelessWidget {
   final RentalStats? stats;
   final List<RentalRecord> rentals;
   final List<Locker> lockers;
+  final List<ControllerStatus> deviceStatuses;
+  final String? deviceError;
   final bool loading;
   final String? error;
   final Future<void> Function() onRefresh;
@@ -34,6 +39,13 @@ class AdminAnalyticsScreen extends StatelessWidget {
       if (rental.lockerId == locker.lockerId && rental.endedAt == null) {
         return '${rental.nama} · ${rental.noHp}';
       }
+    }
+    return null;
+  }
+
+  ControllerStatus? _deviceStatusFor(Locker locker) {
+    for (final device in deviceStatuses) {
+      if (device.controllerId == locker.controllerId) return device;
     }
     return null;
   }
@@ -61,7 +73,10 @@ class AdminAnalyticsScreen extends StatelessWidget {
               padding: const EdgeInsets.only(right: AppSpace.s2),
               child: Center(
                 child: Text(
-                  'Status ESP32 belum tersedia',
+                  deviceStatuses.isEmpty
+                      ? 'ESP32 belum terdaftar'
+                      : '${deviceStatuses.where((device) => device.online).length}'
+                            '/${deviceStatuses.length} ESP32 online',
                   style: AppType.caption.copyWith(
                     color: AppColors.neutralTextMuted,
                   ),
@@ -131,6 +146,12 @@ class AdminAnalyticsScreen extends StatelessWidget {
         : attentionLockers.first;
 
     return [
+      ControllerStatusCard(
+        devices: deviceStatuses,
+        loading: loading,
+        error: deviceError,
+      ),
+      const SizedBox(height: AppSpace.s4),
       if (attentionLocker != null) ...[
         _AttentionBanner(
           count: attentionLockers.length,
@@ -168,6 +189,7 @@ class AdminAnalyticsScreen extends StatelessWidget {
           (locker) => LockerSummaryCard(
             locker: locker,
             tenantName: _tenantFor(locker),
+            deviceStatus: _deviceStatusFor(locker),
             onTap: () => _showLockerDetails(context, locker),
           ),
         ),
@@ -188,6 +210,12 @@ class AdminAnalyticsScreen extends StatelessWidget {
         : attentionLockers.first;
 
     return [
+      ControllerStatusCard(
+        devices: deviceStatuses,
+        loading: loading,
+        error: deviceError,
+      ),
+      const SizedBox(height: AppSpace.s4),
       if (attentionLocker != null) ...[
         _AttentionBanner(
           count: attentionLockers.length,
@@ -317,10 +345,10 @@ class AdminAnalyticsScreen extends StatelessWidget {
 
   List<Widget> _lockerPage(BuildContext context) {
     return [
-      const _DataAvailabilityCard(
-        title: 'Koneksi ESP32',
-        message:
-            'Endpoint locker saat ini belum mengirim status online atau waktu sinkron terakhir.',
+      ControllerStatusCard(
+        devices: deviceStatuses,
+        loading: loading,
+        error: deviceError,
       ),
       const SizedBox(height: AppSpace.s3),
       DesignSectionHeader(title: 'Semua locker (${lockers.length})'),
@@ -343,6 +371,7 @@ class AdminAnalyticsScreen extends StatelessWidget {
           (locker) => LockerSummaryCard(
             locker: locker,
             tenantName: _tenantFor(locker),
+            deviceStatus: _deviceStatusFor(locker),
             onTap: () => _showLockerDetails(context, locker),
           ),
         ),
@@ -386,9 +415,12 @@ class AdminAnalyticsScreen extends StatelessWidget {
                   style: AppType.bodySm,
                 ),
               const SizedBox(height: AppSpace.s4),
-              const Text(
-                'Informasi koneksi perangkat belum tersedia dari API.',
-                style: TextStyle(color: AppColors.neutralTextMuted),
+              Text(
+                locker.controllerId == null
+                    ? 'ESP32 belum terdaftar untuk locker ini.'
+                    : 'ESP32 ${_deviceStatusFor(locker)?.online == true ? 'online' : 'offline'}'
+                          ' · ${_deviceStatusFor(locker)?.lastSeenAt == null ? 'belum pernah tersambung' : 'sinkron terakhir ${_deviceStatusFor(locker)!.lastSeenAt!.toLocal()}'}',
+                style: const TextStyle(color: AppColors.neutralTextMuted),
               ),
             ],
           ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../models/audit_log_record.dart';
+import '../models/controller_status.dart';
 import '../models/locker.dart';
 import '../models/rental_record.dart';
 import '../models/session.dart';
@@ -33,8 +35,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   RentalStats? _stats;
   List<RentalRecord> _rentals = [];
   List<Locker> _lockers = [];
+  List<ControllerStatus> _deviceStatuses = [];
+  List<AuditLogRecord> _auditLogs = [];
   bool _loading = true;
+  bool _auditLoading = true;
   String? _error;
+  String? _deviceError;
+  String? _auditError;
   DateTime? _lastFetch;
   bool _handlingExpiredSession = false;
 
@@ -54,6 +61,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     _api = ApiService()..setToken(widget.session.token);
     _authService = AuthService(_api);
     _loadReports();
+    _loadAudit();
   }
 
   @override
@@ -87,11 +95,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
       ]);
       final lockers = results[0] as List<Locker>;
       final (stats, rentals) = results[1] as (RentalStats, List<RentalRecord>);
+      var devices = <ControllerStatus>[];
+      String? deviceError;
+      try {
+        devices = await _api.fetchControllerStatuses();
+      } catch (e) {
+        if (e is ApiException && e.statusCode == 401) rethrow;
+        deviceError = 'Gagal memuat status ESP32: $e';
+      }
       if (!mounted) return;
       setState(() {
         _lockers = lockers;
         _stats = stats;
         _rentals = rentals;
+        _deviceStatuses = devices;
+        _deviceError = deviceError;
         _loading = false;
         _error = null;
         _lastFetch = DateTime.now();
@@ -105,6 +123,35 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
       setState(() {
         _loading = false;
         if (!silent) _error = 'Gagal memuat data: $e';
+      });
+    }
+  }
+
+  Future<void> _loadAudit() async {
+    if (mounted) {
+      setState(() {
+        _auditLoading = true;
+        _auditError = null;
+      });
+    }
+
+    try {
+      final logs = await _api.fetchAuditLogs();
+      if (!mounted) return;
+      setState(() {
+        _auditLogs = logs;
+        _auditLoading = false;
+        _auditError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      if (e is ApiException && e.statusCode == 401) {
+        await _handleExpiredSession();
+        return;
+      }
+      setState(() {
+        _auditLoading = false;
+        _auditError = 'Gagal memuat log audit: $e';
       });
     }
   }
@@ -170,7 +217,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     stats: _stats,
     rentals: _rentals,
     lockers: _lockers,
+    deviceStatuses: _deviceStatuses,
     loading: _loading,
+    deviceError: _deviceError,
     error: _error,
     onRefresh: _loadReports,
   );
@@ -179,7 +228,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
     stats: _stats,
     rentals: _rentals,
     lockers: _lockers,
+    deviceStatuses: _deviceStatuses,
     loading: _loading,
+    deviceError: _deviceError,
     error: _error,
     onRefresh: _loadReports,
     showLockerListOnly: true,
@@ -188,7 +239,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen>
   Widget _buildHistory() =>
       AdminHistoryScreen(rentals: _rentals, onRefresh: _loadReports);
 
-  Widget _buildAudit() => const AdminAuditScreen();
+  Widget _buildAudit() => AdminAuditScreen(
+    logs: _auditLogs,
+    loading: _auditLoading,
+    error: _auditError,
+    onRefresh: _loadAudit,
+  );
 
   Widget _buildAccountPage() => _AdminAccountPage(
     session: widget.session,

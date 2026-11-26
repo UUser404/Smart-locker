@@ -297,6 +297,10 @@ Saat backend menerima `event: "closed"`:
 
 Endpoint alternatif yang **menggabungkan `/poll` dan `/report` menjadi satu request**. ESP32 mengirim state pintu + solenoid setiap 2 detik, dan backend mendeteksi transisi pintu sendiri dengan cara membandingkan dengan state sebelumnya (disimpan di memori).
 
+Setiap `/sync` yang berhasil memperbarui `lastSeenAt` pada dokumen controller.
+Nilai tersebut dipakai oleh `GET /api/admin/devices/status` untuk menghitung
+status koneksi ESP32.
+
 Memerlukan header `X-Device-Token` (lihat bagian 5.0).
 
 **Keuntungan:** ESP32 hanya kirim 1 request per siklus, hemat bandwidth + TLS handshake.
@@ -441,6 +445,8 @@ Authorization: Bearer <token_dari_login>
 Endpoint yang diproteksi JWT:
 
 - `GET /api/admin/lockers`
+- `GET /api/admin/devices/status` (role `admin` atau `petugas`)
+- `GET /api/admin/audit` (role `admin` atau `petugas`)
 - `POST /api/admin/lockers/{locker_id}/resolve`
 - `POST /api/admin/lockers/{locker_id}/emergency-open` (role `admin` atau `petugas`)
 - `GET /api/admin/reports/rentals` (khusus role `admin`)
@@ -461,8 +467,77 @@ Endpoint yang diproteksi JWT:
       "status": "needs_attention",
       "unlocked_since": "2026-09-16T10:05:00Z"
     },
-    { "locker_id": "locker_03", "status": "occupied", "elapsed_seconds": 620 },
+    {
+      "locker_id": "locker_03",
+      "status": "occupied",
+      "elapsed_seconds": 620,
+      "controller_id": "esp32_01"
+    },
     { "locker_id": "locker_04", "status": "empty" }
+  ]
+}
+```
+
+### 10.3.1 Status koneksi ESP32
+
+**`GET /api/admin/devices/status`** — butuh JWT, role `admin` atau `petugas`
+
+Admin dan petugas memakai endpoint yang sama. Firmware memperbarui `lastSeenAt`
+ketika berhasil mengirim `/sync` (atau endpoint firmware `/poll` dan `/report`
+yang lama). Perangkat dianggap online bila sinkronisasi terakhir terjadi dalam
+15 detik terakhir; firmware utama mengirim `/sync` setiap 2 detik.
+
+**Contoh response (200):**
+
+```json
+{
+  "devices": [
+    {
+      "controller_id": "esp32_01",
+      "online": true,
+      "last_seen_at": "2026-11-26T01:39:50.000Z",
+      "online_window_seconds": 15
+    }
+  ]
+}
+```
+
+Controller yang belum pernah mengirim heartbeat dikembalikan sebagai
+`online: false` dan `last_seen_at: null`.
+
+### 10.3.2 Log audit dan riwayat petugas
+
+**`GET /api/admin/audit`** — butuh JWT, role `admin` atau `petugas`
+
+Endpoint yang sama digunakan halaman Log Audit admin dan halaman Riwayat
+petugas. Admin menerima seluruh log; petugas hanya menerima tindakan dengan
+username miliknya. Response memuat maksimal 100 tindakan terbaru, termasuk
+catatan lama dari koleksi `emergency_actions`.
+
+Tindakan yang dicatat saat ini:
+
+- `emergency_open` — petugas/admin meminta buka darurat; memuat alasan, hasil
+  antrean, dan pilihan apakah sesi diakhiri.
+- `locker_resolved` — petugas/admin menyelesaikan pemeriksaan locker.
+
+**Contoh response (200):**
+
+```json
+{
+  "audit_logs": [
+    {
+      "event_id": "event-id",
+      "action": "emergency_open",
+      "locker_id": "locker_01",
+      "rental_id": "rental-id",
+      "actor_username": "petugas01",
+      "actor_name": "Petugas",
+      "actor_role": "petugas",
+      "reason": "Pintu macet",
+      "end_session": true,
+      "result": "queued",
+      "occurred_at": "2026-11-26T01:39:50.000Z"
+    }
   ]
 }
 ```
@@ -471,7 +546,7 @@ Endpoint yang diproteksi JWT:
 
 **`POST /api/admin/lockers/{locker_id}/resolve`** — butuh JWT
 
-Dipanggil petugas lewat app setelah mengecek & menutup manual locker yang berstatus `needs_attention`, mengembalikan status locker ke `empty`.
+Dipanggil petugas lewat app setelah mengecek & menutup manual locker yang berstatus `needs_attention`, mengembalikan status locker ke `empty`. Jika `pendingEnd` aktif, endpoint juga menyelesaikan rental terkait sebelum menghapus referensi rental dari locker.
 
 **Contoh response sukses (200):**
 
@@ -492,7 +567,7 @@ Dipanggil petugas lewat app setelah mengecek & menutup manual locker yang bersta
 
 **`POST /api/admin/lockers/{locker_id}/emergency-open`** — butuh JWT, role `admin` atau `petugas`
 
-Memvalidasi sesi aktif, mencatat alasan dan petugas di koleksi `emergency_actions`, lalu mengantrekan perintah `unlock` untuk firmware. Endpoint hanya menerima locker berstatus `occupied`.
+Memvalidasi sesi aktif, mencatat alasan dan petugas di koleksi `audit_logs`, lalu mengantrekan perintah `unlock` untuk firmware. Endpoint hanya menerima locker berstatus `occupied`.
 
 **Request body:**
 

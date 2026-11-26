@@ -12,6 +12,9 @@ const {
 } = require("../services/commandQueueService");
 const tokenStore = require("../services/tokenStoreService");
 const {
+    recordControllerHeartbeat
+} = require("../services/controllerStatusService");
+const {
     Timestamp
 } = require("firebase-admin/firestore");
 
@@ -26,6 +29,7 @@ router.get("/:controllerId/poll", requireDeviceAuth, async (req, res) => {
     try {
         const commands = await consumeCommands(db, controllerId);
         const qr_tokens = await collectQrTokens(db, controllerId);
+        await recordControllerHeartbeat(db, controllerId);
 
         return res.status(200).json({
             commands,
@@ -91,6 +95,7 @@ router.post("/:controllerId/report", requireDeviceAuth, async (req, res) => {
             await lockerRef.update({
                 unlockedSince: Timestamp.now()
             });
+            await recordControllerHeartbeat(db, controllerId);
             return res.status(200).json({
                 status: "ok"
             });
@@ -140,6 +145,7 @@ router.post("/:controllerId/report", requireDeviceAuth, async (req, res) => {
             // Status locker tetap occupied, tidak ada perubahan token store
         }
 
+        await recordControllerHeartbeat(db, controllerId);
         return res.status(200).json({
             status: "ok"
         });
@@ -225,6 +231,7 @@ router.post("/:controllerId/sync", requireDeviceAuth, async (req, res) => {
         // Ambil commands + qr_tokens (sama seperti /poll)
         const commands = await consumeCommands(db, controllerId);
         const qr_tokens = await collectQrTokens(db, controllerId);
+        await recordControllerHeartbeat(db, controllerId);
 
         return res.status(200).json({
             commands,
