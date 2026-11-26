@@ -23,6 +23,7 @@ class Locker {
   unlockedSince; // dari field `unlocked_since` (needs_attention)
   final DateTime? needsAttentionSince;
   final String? currentRentalId;
+  final String? controllerId;
 
   Locker({
     required this.lockerId,
@@ -31,6 +32,7 @@ class Locker {
     this.unlockedSince,
     this.needsAttentionSince,
     this.currentRentalId,
+    this.controllerId,
   });
 
   // ============ DERIVED GETTERS (untuk UI) ============
@@ -85,5 +87,6 @@ class Locker {
         ? null
         : DateTime.parse(json['needs_attention_since'] as String),
     currentRentalId: json['current_rental_id'] as String?,
+    controllerId: json['controller_id'] as String?,
   );
 }

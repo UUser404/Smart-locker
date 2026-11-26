@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import '../models/locker.dart';
 import '../models/session.dart';
 import '../models/rental_record.dart';
+import '../models/audit_log_record.dart';
+import '../models/controller_status.dart';
 
 // === KONFIGURASI BACKEND ===
 // Ganti sesuai domain backend kamu. Jangan pakai trailing slash.
@@ -93,6 +95,58 @@ class ApiService {
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     final list = (body['lockers'] as List<dynamic>? ?? []);
     return list.map((e) => Locker.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// GET /api/admin/devices/status (admin dan petugas)
+  Future<List<ControllerStatus>> fetchControllerStatuses() async {
+    final res = await _client
+        .get(_uri('/admin/devices/status'), headers: _headers(json: false))
+        .timeout(const Duration(seconds: 30));
+
+    if (res.statusCode == 401) {
+      throw ApiException('Sesi berakhir, silakan login ulang', statusCode: 401);
+    }
+    if (res.statusCode == 403) {
+      throw ApiException('Akses status perangkat ditolak', statusCode: 403);
+    }
+    if (res.statusCode != 200) {
+      throw ApiException(
+        'Gagal memuat status ESP32 (${res.statusCode})',
+        statusCode: res.statusCode,
+      );
+    }
+
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    final devices = body['devices'] as List<dynamic>? ?? [];
+    return devices
+        .map((item) => ControllerStatus.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// GET /api/admin/audit (admin melihat semua, petugas melihat tindakannya)
+  Future<List<AuditLogRecord>> fetchAuditLogs() async {
+    final res = await _client
+        .get(_uri('/admin/audit'), headers: _headers(json: false))
+        .timeout(const Duration(seconds: 30));
+
+    if (res.statusCode == 401) {
+      throw ApiException('Sesi berakhir, silakan login ulang', statusCode: 401);
+    }
+    if (res.statusCode == 403) {
+      throw ApiException('Akses log audit ditolak', statusCode: 403);
+    }
+    if (res.statusCode != 200) {
+      throw ApiException(
+        'Gagal memuat log audit (${res.statusCode})',
+        statusCode: res.statusCode,
+      );
+    }
+
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    final logs = body['audit_logs'] as List<dynamic>? ?? [];
+    return logs
+        .map((item) => AuditLogRecord.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   /// POST /api/admin/lockers/{id}/resolve  (butuh JWT)

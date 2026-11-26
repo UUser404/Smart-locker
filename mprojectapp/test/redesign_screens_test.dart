@@ -8,7 +8,7 @@ import 'package:mprojectapp/screens/petugas_locker_screens.dart';
 import 'package:mprojectapp/widgets/design_system_widgets.dart';
 
 void main() {
-  testWidgets('locker card marks unavailable ESP32 status without guessing', (
+  testWidgets('locker card marks unlinked ESP32 status as unknown', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -29,7 +29,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Status ESP32 belum tersedia dari API'), findsOneWidget);
+    expect(find.text('ESP32 belum terdaftar'), findsOneWidget);
     expect(find.text('Online'), findsNothing);
   });
 

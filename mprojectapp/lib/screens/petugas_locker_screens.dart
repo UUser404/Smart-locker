@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/gestures.dart' show kLongPressTimeout;
 import 'package:flutter/material.dart';
 
+import '../models/controller_status.dart';
 import '../models/locker.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_tokens.dart';
@@ -13,10 +14,12 @@ class LockerDetailScreen extends StatelessWidget {
     required this.locker,
     required this.onHandle,
     required this.onEmergencyOpen,
+    this.deviceStatus,
     super.key,
   });
 
   final Locker locker;
+  final ControllerStatus? deviceStatus;
   final Future<bool> Function() onHandle;
   final Future<void> Function(String reason, bool endSession) onEmergencyOpen;
 
@@ -25,6 +28,11 @@ class LockerDetailScreen extends StatelessWidget {
     final style = lockerStatusStyle(locker.status);
     final isOccupied = locker.status == LockerStatus.occupied;
     final isAttention = locker.status == LockerStatus.needsAttention;
+    final connection = deviceStatus == null
+        ? 'Belum ada data'
+        : deviceStatus!.online
+        ? 'Online'
+        : 'Offline';
 
     return Scaffold(
       appBar: AppBar(title: Text(locker.lockerId)),
@@ -74,11 +82,13 @@ class LockerDetailScreen extends StatelessWidget {
               padding: const EdgeInsets.all(AppSpace.s4),
               child: Column(
                 children: [
-                  _InfoRow(label: 'Status perangkat', value: 'Belum tersedia'),
+                  _InfoRow(label: 'Status perangkat', value: connection),
                   const Divider(height: AppSpace.s6),
                   _InfoRow(
                     label: 'Koneksi ESP32',
-                    value: 'Belum disediakan oleh server',
+                    value: deviceStatus?.lastSeenAt == null
+                        ? 'Belum pernah tersambung'
+                        : 'Sync ${_formatLastSeen(deviceStatus!.lastSeenAt!)}',
                   ),
                 ],
               ),
@@ -101,17 +111,16 @@ class LockerDetailScreen extends StatelessWidget {
               locker: locker,
               onEmergencyOpen: onEmergencyOpen,
             ),
-          if (isOccupied) ...[
-            const SizedBox(height: AppSpace.s3),
-            const _UnavailableAction(
-              title: 'Riwayat locker',
-              message:
-                  'Riwayat per locker belum tersedia pada API untuk role Petugas.',
-            ),
-          ],
         ],
       ),
     );
+  }
+
+  String _formatLastSeen(DateTime value) {
+    final seconds = DateTime.now().difference(value).inSeconds;
+    if (seconds < 5) return 'baru saja';
+    if (seconds < 60) return '$seconds detik lalu';
+    return '${(seconds / 60).floor()} menit lalu';
   }
 }
 
@@ -354,28 +363,6 @@ class _ChecklistTile extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: AppSpace.s3),
         title: Text(title, style: AppType.bodyStrong),
         subtitle: Text(subtitle, style: AppType.caption),
-      ),
-    );
-  }
-}
-
-class _UnavailableAction extends StatelessWidget {
-  const _UnavailableAction({required this.title, required this.message});
-
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: AppColors.neutralSurfaceMuted,
-      child: ListTile(
-        leading: const Icon(
-          Icons.info_outline,
-          color: AppColors.neutralTextMuted,
-        ),
-        title: Text(title, style: AppType.bodyStrong),
-        subtitle: Text(message, style: AppType.caption),
       ),
     );
   }

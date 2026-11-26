@@ -14,6 +14,12 @@ const {
     getRentalsReport
 } = require("../services/reportService");
 const tokenStore = require("../services/tokenStoreService");
+const {
+    getControllerStatuses
+} = require("../services/controllerStatusService");
+const {
+    Timestamp
+} = require("firebase-admin/firestore");
 
 const router = express.Router();
 
@@ -30,7 +36,8 @@ router.get("/lockers", requireAuth, async (req, res) => {
             const data = doc.data();
             const item = {
                 locker_id: doc.id,
-                status: data.status
+                status: data.status,
+                controller_id: data.controllerId || null,
             };
 
             if (data.status === "occupied" && data.currentRentalId) {
@@ -75,6 +82,7 @@ router.post("/lockers/:id/resolve", requireAuth, async (req, res) => {
     const {
         id: lockerId
     } = req.params;
+    const auditRef = db.collection("audit_logs").doc();
 
     try {
         const lockerRef = db.collection("lockers").doc(lockerId);
@@ -87,6 +95,39 @@ router.post("/lockers/:id/resolve", requireAuth, async (req, res) => {
             if (locker.status !== "needs_attention") {
                 throw new Error("NOT_NEEDS_ATTENTION");
             }
+
+            const resolvedAt = Timestamp.now();
+            if (locker.pendingEnd === true && locker.currentRentalId) {
+                const rentalRef = db.collection("rentals").doc(locker.currentRentalId);
+                const rentalDoc = await tx.get(rentalRef);
+                if (!rentalDoc.exists) throw new Error("RENTAL_NOT_FOUND");
+
+                const rental = rentalDoc.data();
+                if (rental.status !== "completed") {
+                    const endedAt = resolvedAt.toDate();
+                    const totalDurationSeconds = Math.floor(
+                        (endedAt.getTime() - rental.startedAt.toDate().getTime()) / 1000
+                    );
+
+                    tx.update(rentalRef, {
+                        status: "completed",
+                        endedAt: Timestamp.fromDate(endedAt),
+                        totalDurationSeconds,
+                    });
+                }
+            }
+
+            const actor = req.user || {};
+            tx.create(auditRef, {
+                action: "locker_resolved",
+                lockerId,
+                rentalId: locker.currentRentalId || null,
+                requestedBy: actor.username || null,
+                requestedByName: actor.nama || null,
+                role: actor.role || null,
+                result: "resolved",
+                occurredAt: resolvedAt,
+            });
 
             tx.update(lockerRef, {
                 status: "empty",
@@ -116,6 +157,12 @@ router.post("/lockers/:id/resolve", requireAuth, async (req, res) => {
         });
     } catch (err) {
         if (err.message === "LOCKER_NOT_FOUND") {
+            return res.status(404).json({
+                status: "error",
+                message: err.message
+            });
+        }
+        if (err.message === "RENTAL_NOT_FOUND") {
             return res.status(404).json({
                 status: "error",
                 message: err.message
@@ -160,7 +207,7 @@ router.post(
         }
 
         const lockerRef = db.collection("lockers").doc(lockerId);
-        const auditRef = db.collection("emergency_actions").doc();
+        const auditRef = db.collection("audit_logs").doc();
         const requestedAt = new Date();
 
         try {
@@ -209,7 +256,7 @@ router.post(
                     requestedByName: actor.nama || null,
                     role: actor.role || null,
                     result: "queued",
-                    requestedAt,
+                    occurredAt: Timestamp.fromDate(requestedAt),
                 });
 
                 return {
@@ -325,6 +372,97 @@ router.post("/unregister-device", requireAuth, async (req, res) => {
         });
     }
 });
+
+// ============================================================
+// GET /api/admin/devices/status — admin dan petugas
+// ============================================================
+router.get(
+    "/devices/status",
+    requireAuth,
+    requireRole("admin", "petugas"),
+    async (_req, res) => {
+        try {
+            const devices = await getControllerStatuses(db);
+            return res.status(200).json({ devices });
+        } catch (err) {
+            console.error("[device-status] error:", err);
+            return res.status(500).json({
+                status: "error",
+                message: "SERVER_ERROR",
+            });
+        }
+    }
+);
+
+// ============================================================
+// GET /api/admin/audit — admin melihat semua, petugas melihat tindakannya
+// ============================================================
+router.get(
+    "/audit",
+    requireAuth,
+    requireRole("admin", "petugas"),
+    async (req, res) => {
+        try {
+            const isAdmin = req.user.role === "admin";
+            const actorQuery = isAdmin
+                ? null
+                : req.user.username;
+            if (!isAdmin && !actorQuery) {
+                return res.status(403).json({
+                    status: "error",
+                    message: "FORBIDDEN",
+                });
+            }
+            const collections = ["audit_logs", "emergency_actions"];
+            const snapshots = await Promise.all(collections.map((name) => {
+                const collection = db.collection(name);
+                return actorQuery
+                    ? collection.where("requestedBy", "==", actorQuery).get()
+                    : collection.get();
+            }));
+
+            const auditLogs = snapshots.flatMap((snapshot) =>
+                snapshot.docs.map((doc) => {
+                    const data = doc.data();
+                    const occurredAt = data.occurredAt || data.requestedAt || null;
+                    const occurredAtDate = occurredAt && typeof occurredAt.toDate === "function"
+                        ? occurredAt.toDate()
+                        : occurredAt instanceof Date
+                            ? occurredAt
+                            : null;
+
+                    return {
+                        event_id: doc.id,
+                        action: data.action || "emergency_open",
+                        locker_id: data.lockerId || null,
+                        rental_id: data.rentalId || null,
+                        actor_username: data.requestedBy || null,
+                        actor_name: data.requestedByName || null,
+                        actor_role: data.role || null,
+                        reason: data.reason || null,
+                        end_session: data.endSession ?? null,
+                        result: data.result || null,
+                        occurred_at: occurredAtDate
+                            ? occurredAtDate.toISOString()
+                            : null,
+                    };
+                })
+            ).sort((a, b) => {
+                const aTime = a.occurred_at ? Date.parse(a.occurred_at) : 0;
+                const bTime = b.occurred_at ? Date.parse(b.occurred_at) : 0;
+                return bTime - aTime;
+            }).slice(0, 100);
+
+            return res.status(200).json({ audit_logs: auditLogs });
+        } catch (err) {
+            console.error("[audit] error:", err);
+            return res.status(500).json({
+                status: "error",
+                message: "SERVER_ERROR",
+            });
+        }
+    }
+);
 
 // ============================================================
 // GET /api/admin/reports/rentals — hanya admin
