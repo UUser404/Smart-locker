@@ -505,7 +505,60 @@ yang lama). Perangkat dianggap online bila sinkronisasi terakhir terjadi dalam
 Controller yang belum pernah mengirim heartbeat dikembalikan sebagai
 `online: false` dan `last_seen_at: null`.
 
-### 10.3.2 Log audit dan riwayat petugas
+Status di atas adalah status **controller ESP32**, bukan tes koneksi untuk
+setiap locker. Backend menghubungkan status controller ke locker melalui field
+`controllerId` dan `lockerIndex` pada dokumen `lockers/{locker_id}`. Karena itu,
+semua locker yang dipetakan ke controller yang sama akan mengikuti heartbeat
+controller tersebut.
+
+### 10.3.2 Pendaftaran controller dan pemetaan locker
+
+Controller baru harus didaftarkan sebelum firmware dapat mengirim heartbeat.
+Autentikasi menolak controller yang belum terdaftar; perangkat tidak
+auto-enroll hanya karena tersambung ke jaringan.
+
+Di PowerShell, daftarkan ID controller baru:
+
+```powershell
+Set-Location backend-express
+$env:CONTROLLER_ID = "esp32_02"
+npm run register:controller
+```
+
+Simpan token yang dicetak oleh perintah tersebut sebagai `DEVICE_TOKEN` pada
+konfigurasi firmware perangkat itu, lalu flash perangkat. Setiap ESP32 harus
+memiliki ID dan token unik.
+
+Petakan perangkat ke locker dan index fisik:
+
+```powershell
+Set-Location backend-express
+$env:LOCKER_ID = "locker_02"
+$env:CONTROLLER_ID = "esp32_02"
+$env:LOCKER_INDEX = "0"
+npm run configure:locker
+```
+
+Untuk melepas pemetaan locker yang belum memiliki ESP32:
+
+```powershell
+Set-Location backend-express
+$env:LOCKER_ID = "locker_02"
+$env:CONTROLLER_ID = ""
+npm run configure:locker
+```
+
+Perintah pemetaan hanya mengubah `controllerId` dan `lockerIndex`, tanpa
+mereset sesi, token QR, atau status locker. Restart backend sesudah perubahan
+agar in-memory token store memuat pemetaan terbaru. Setelah terdaftar dan
+terpetakan, penambahan controller berikutnya tidak memerlukan perubahan source
+backend; identitas firmware dan pemetaan data tetap perlu diprovisikan.
+
+Pada konfigurasi firmware repository saat ini, `ACTIVE_LOCKERS` bernilai `1`
+dan controller `esp32_01` hanya mengaktifkan index `0`. Jangan memetakan locker
+lain ke controller tersebut kecuali memang terhubung secara fisik dan aktif.
+
+### 10.3.3 Log audit dan riwayat petugas
 
 **`GET /api/admin/audit`** — butuh JWT, role `admin` atau `petugas`
 

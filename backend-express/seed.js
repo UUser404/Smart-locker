@@ -34,8 +34,8 @@ async function seed() {
       unlockedSince: null,
       pendingCommand: null,
       pendingEnd: false,
-      controllerId: "esp32_01",
-      lockerIndex: i,
+      controllerId: lockerId === "locker_01" ? "esp32_01" : null,
+      lockerIndex: lockerId === "locker_01" ? 0 : null,
     }, {
       merge: true
     }, );

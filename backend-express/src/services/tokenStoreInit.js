@@ -22,8 +22,6 @@ const FALLBACK_LOCKERS = [{
         index: 3
     },
 ];
-const CONTROLLER_ID = "esp32_01";
-
 let retryTimer = null;
 
 async function tryInitFromFirestore() {
@@ -54,7 +52,7 @@ function initFallback() {
             status: "empty",
             frozen: false,
             lockerIndex: l.index,
-            controllerId: CONTROLLER_ID,
+            controllerId: null,
         });
 
         lockerStateStore.init(l.id);

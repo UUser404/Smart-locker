@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "seed": "node seed.js"
+    "seed": "node seed.js",
+    "register:controller": "node registerController.js",
+    "configure:locker": "node configureLockerController.js"
   },
   "keywords": [],
   "author": "",

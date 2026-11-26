@@ -258,7 +258,12 @@ Buka VS Code → Thunder Client. Pastikan request berikut sudah ada:
   **A:** Hash SHA-256, tampil 1x saja. Rate limiter 5x gagal → lock 5 menit. Pesan error generik supaya tidak bisa ditebak.
 
 * **Q: Bagaimana scaling ke lebih banyak locker?**  
-  **A:** Arsitektur sudah support. Tambah `controllerId` baru di Firestore, tambah unit ESP32, semua sistem otomatis.
+  **A:** Endpoint status mengambil controller secara dinamis. Daftarkan ID dan
+  token unik dengan `npm run register:controller`, petakan controller ke
+  locker (`controllerId` + `lockerIndex`) dengan `npm run configure:locker`,
+  lalu flash firmware dengan identitas itu. Backend tidak perlu diubah untuk
+  controller baru, tetapi perangkat tidak auto-enroll tanpa provisioning
+  karena endpoint firmware mewajibkan token.
 
 * **Q: Kenapa pakai endpoint `/sync`?**  
   **A:** Hemat request — gabung poll + report jadi 1 request. ESP32 lebih ringan. State pintu dideteksi backend dari perbandingan.
